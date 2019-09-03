@@ -47,7 +47,7 @@ namespace
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
 	HeapSetInformation(NULL, HeapEnableTerminationOnCorruption, NULL, 0);
-	hBitmap = LoadBitmap(hInstance, MAKEINTRESOURCE(IDB_BITMAP1));
+	hBitmap = LoadBitmap(hInstance, MAKEINTRESOURCE(IDB_BITMAP2));
 	initialize(hInstance);
 
 	SSXLoader::LoadFiles();
@@ -101,8 +101,8 @@ void initialize(HINSTANCE hInstance)
 	SettingsClass.hCursor = LoadCursor(NULL, IDC_ARROW);
 	SettingsClass.hbrBackground = CreateSolidBrush(COLORREF(0xf0f0f0));
 	SettingsClass.cbSize = sizeof(WNDCLASSEX);
-	SettingsClass.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(108));
-	SettingsClass.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(108));
+	SettingsClass.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
+	SettingsClass.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
 	SettingsClass.hInstance = hInstance;
 	SettingsClass.lpfnWndProc = WndProc;
 	SettingsClass.lpszClassName = "SASETTINGS";
