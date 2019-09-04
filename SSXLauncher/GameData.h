@@ -11,10 +11,10 @@
 class GameData
 {
 public:
-	enum FunctionType { MAIN_LOOP, CD_CHECK, DS_SLEEP, VERSIONS, RENDERER };
+	enum FunctionType { MAIN_LOOP, CD_CHECK, DS_SLEEP, VERSIONS, RENDERER, RES_LOOKUP, GLOBAL_INIT };
 
-	enum DWORDType { RENDERER_TYPE, MY_SLEEP };
-	enum Version { VCLASSICS };
+	enum DWORDType { RENDERER_TYPE, MY_SLEEP, RES_TYPE };
+	enum Version { VERSION_1_0 };
 	static void initialize(PEINFO info);
 	static bool PatchGame(std::string game_exe, GameData::Version version);
 	static DWORD GetDWORDOffset(GameData::Version version, GameData::DWORDType dword_type);

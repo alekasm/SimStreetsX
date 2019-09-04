@@ -40,7 +40,7 @@ namespace
 	bool CanEnd = false;
 	bool end_process = false;
 
-	int speedMS = 16;
+	int speedMS = 24;
 	HBITMAP hBitmap = NULL;
 }
 
@@ -70,27 +70,6 @@ void destroy()
 {
 	if (settingsHwnd != NULL)
 		DestroyWindow(settingsHwnd);
-}
-
-void SetErrorCode(int id)
-{
-	DestroyWindow(wsRadioButton);
-	DestroyWindow(fsRadioButton);
-	DestroyWindow(speedTextbox);
-	DestroyWindow(verifyCheckbox);
-	DestroyWindow(PatchButton);
-	DestroyWindow(StartButton);
-	DestroyWindow(UpdateButton);
-	DestroyWindow(resolutionCombobox);
-	DestroyWindow(SensitivityBar);
-	DestroyWindow(HelpButton);
-
-	char buffer[64];
-	sprintf_s(buffer, "Error Code: %d \r\n Please report this error on the forums!", id);
-	resolutionTextbox = CreateWindow("EDIT", buffer,
-		WS_CHILD | WS_VISIBLE | ES_LEFT | ES_READONLY | ES_MULTILINE,
-		5, 10, 400, 190, settingsHwnd, NULL, NULL, NULL);
-	UpdateWindow(resolutionTextbox);
 }
 
 void initialize(HINSTANCE hInstance)
@@ -135,7 +114,7 @@ void initialize(HINSTANCE hInstance)
 		TRACKBAR_CLASS, "TEST", WS_VISIBLE | WS_CHILD | TBS_HORZ | TBS_AUTOTICKS,
 		220, 95, 150, 20, settingsHwnd, NULL, NULL, NULL);
 
-	speedTextbox = CreateWindow("EDIT", "Game Speed: 16ms",
+	speedTextbox = CreateWindow("EDIT", "Game Speed: 24ms",
 		WS_CHILD | WS_VISIBLE | ES_LEFT | ES_READONLY | ES_MULTILINE,
 		230, 125, 150, 20, settingsHwnd, NULL, NULL, NULL);
 
@@ -156,7 +135,7 @@ void initialize(HINSTANCE hInstance)
 		NULL, NULL);	
 
 	StartButton = CreateWindow(
-		"Button", "Dispatch!", WS_VISIBLE | WS_CHILDWINDOW | BS_PUSHBUTTON,
+		"Button", "Drive!", WS_VISIBLE | WS_CHILDWINDOW | BS_PUSHBUTTON,
 		110, 225, 150, 25, settingsHwnd, NULL,
 		NULL, NULL);
 
@@ -167,7 +146,7 @@ void initialize(HINSTANCE hInstance)
 
 	SendMessage(SensitivityBar, TBM_SETRANGEMIN, WPARAM(FALSE), LPARAM(1));
 	SendMessage(SensitivityBar, TBM_SETRANGEMAX, WPARAM(FALSE), LPARAM(7));
-	SendMessage(SensitivityBar, TBM_SETPOS, WPARAM(FALSE), LPARAM(4));
+	SendMessage(SensitivityBar, TBM_SETPOS, WPARAM(FALSE), LPARAM(5));
 	SendMessage(SensitivityBar, TBM_SETTICFREQ, WPARAM(1), LPARAM(0));
 
 	UpdateWindow(PatchButton);

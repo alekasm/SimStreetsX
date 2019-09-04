@@ -24,8 +24,6 @@ DWORD GameData::GetDWORDOffset(GameData::Version version, GameData::DWORDType dw
 	return master->GetFileOffset(games[version].global_dwords[dword_type]);
 }
 
-
-
 void GameData::CreateCDFunction(GameData::Version version)
 {
 	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::CD_CHECK);
@@ -118,15 +116,19 @@ void GameData::initialize(PEINFO info)
 	version_classics.functions[MAIN_LOOP] = 0x5169B0;
 	version_classics.functions[DS_SLEEP] = 0xC53794;
 	version_classics.functions[CD_CHECK] = 0x5317F0;
-	version_classics.functions[RENDERER] = 0x470480;
+	version_classics.functions[RENDERER] = 0x470480;	
 
-	version_classics.global_dwords[RENDERER_TYPE] = 0x6906BC; //1 = Software, 0 = Glide
+	version_classics.global_dwords[RENDERER_TYPE] = 0x6906BC; //1 = Software, 0 = Glide	
 
 	//---------- IN PROGRESS
 	version_classics.functions[VERSIONS] = 0x470F90;
+	version_classics.global_dwords[RES_TYPE] = 0x5E7898; //Default  = 1, 640x480
+	version_classics.functions[RES_LOOKUP] = 0x49C4C0;
+	version_classics.functions[GLOBAL_INIT] = 0x46F8A0;
+	
 
 	//---------- Below here contains completely new functions/variables
 	version_classics.global_dwords[MY_SLEEP] = master->base_location + 0x4;
-	games[VCLASSICS] = version_classics;
+	games[VERSION_1_0] = version_classics;
 
 }

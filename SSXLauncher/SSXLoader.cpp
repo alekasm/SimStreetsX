@@ -12,23 +12,23 @@ namespace
 {
 	const std::string patch_file("SSXPatch.dat");
 	const std::string game_file("Streets.exe");
-	const int SSX_VERSION = 0;
+	const int SSX_VERSION = 1;
 
 	std::map<std::string, GameData::Version> version_hashes = 
 	{
-		{"df473d94fb4d6741628d58c251224c02", GameData::Version::VCLASSICS},
+		{"df473d94fb4d6741628d58c251224c02", GameData::Version::VERSION_1_0},
 	};
 
 	std::map<GameData::Version, std::string> version_description = 
 	{
-		{GameData::Version::VCLASSICS, "Classics Version - February 1998"},
+		{GameData::Version::VERSION_1_0, "Version 1.0 - October 21, 1997"},
 	};
 
 	std::string SimStreetsXDirectory;
 	std::string SimStreetsGameLocation = "";
 	std::string SimStreetsGameRootDirectory = "";
 
-	const std::string version_url("http://simcopter.net/versions.dat");
+	const std::string version_url("http://streetsofsimcity.com/versions.dat");
 	std::string patched_hash;
 	int patched_ssxversion = -1;
 
@@ -317,34 +317,10 @@ bool SSXLoader::StartSCX(int sleep_time, int resolution_mode, bool fullscreen)
 	BYTE sleep_value(sleep_time);
 	Patcher::Patch(DataValue(sleep_offset, sleep_value), SimStreetsGameLocation);
 
-	/*
-
-	//Just to keep things explicit, might make this dynamic in the future
-	int dword_5017D0 = resolution_mode;
-	int dword_5017A8 = sleep_time;
-
-	FILE* efile;
-	int result = fopen_s(&efile, SimStreetsGameLocation.c_str(), "r+");
-	if (efile == nullptr)
-	{
-		ShowMessage(std::string("SimStreetsX Error (" + std::to_string(result) + ")"), std::string("Failed to load exe file for patching: " + SimStreetsGameLocation + "\n"));
-		return false;
-	}
-	
-	DWORD sleep_offset = GameData::GetDWORDOffset(game_version, GameData::DWORDType::MY_SLEEP);
-	BYTE sleep_value(sleep_time);
-
-	fseek(efile, sleep_offset, SEEK_SET);
-	fprintf(efile, "%c", dword_5017A8);
-
-	fclose(efile);
-	*/
-	//Can only get the hash at this point as a reference, can't use it to check for complete validty
-	//because changing sleep time and resolution mode dwords will change the hash
-
 	CreatePatchFile();
 
 	std::string parameters = fullscreen ? "-f" : "-w";
+	parameters += " -o0"; //TODO figure out which global dwords this changes
 	HINSTANCE hInstance = ShellExecuteA(NULL, "open", SimStreetsGameLocation.c_str(), parameters.c_str(), NULL, SW_SHOWDEFAULT);
 	int h_result = reinterpret_cast<int>(hInstance);
 	if (h_result <= 31)
