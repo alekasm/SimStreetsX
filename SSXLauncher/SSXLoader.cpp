@@ -12,8 +12,7 @@ namespace
 {
 	const std::string patch_file("SSXPatch.dat");
 	const std::string game_file("Streets.exe");
-	const int SSX_VERSION = 1;
-
+	
 	std::map<std::string, GameData::Version> version_hashes = 
 	{
 		{"df473d94fb4d6741628d58c251224c02", GameData::Version::VERSION_1_0},
@@ -28,7 +27,6 @@ namespace
 	std::string SimStreetsGameLocation = "";
 	std::string SimStreetsGameRootDirectory = "";
 
-	const std::string version_url("http://streetsofsimcity.com/versions.dat");
 	std::string patched_hash;
 	int patched_ssxversion = -1;
 
@@ -261,18 +259,15 @@ bool VerifyPatchedGame()
 	}
 
 	std::string hash_check = CreateMD5Hash(SimStreetsGameLocation);
-	printf("Verification: ");
-	printf(patched_hash.c_str());
-	printf(hash_check.c_str());
 	if (hash_check.compare(patched_hash) != 0)
 	{
 		ClearPatchFile("The patched game doesn't have a matching hash, this can happen if you modified the patched game or restored it back to the original game. Please try repatching.");
 		return false;
 	}
 
-	if (patched_ssxversion != SSX_VERSION)
+	if (patched_ssxversion != SSXLoader::SSX_VERSION)
 	{
-		ClearPatchFile(std::string("You currently have SimStreetsX Version " + std::to_string(SSX_VERSION) + " however the game was \npreviously patched using Version " +
+		ClearPatchFile(std::string("You currently have SimStreetsX Version " + std::to_string(SSXLoader::SSX_VERSION) + " however the game was \npreviously patched using Version " +
 			std::to_string(patched_ssxversion) + ". Please repatch the game."));
 		return false;
 	}
@@ -329,46 +324,6 @@ bool SSXLoader::StartSCX(int sleep_time, int resolution_mode, bool fullscreen)
 		return false;
 	}
 	return true;
-}
-
-void SSXLoader::CheckForUpdates()
-{
-	int server_version = -1;
-	std::string response = GetResponseCode(version_url.c_str());
-	if (response.empty())
-	{
-		OutputDebugString("Failed to check for the latest server versions \n");
-		server_version = -1;
-	}
-	else
-	{
-		server_version = std::atoi(response.c_str());
-	}
-	OutputDebugString(std::string("Latest Version: " + std::to_string(server_version) + " and our version is: " + std::to_string(SSX_VERSION) + "\n").c_str());
-
-	std::string this_version = "Your Version: " + std::to_string(SSX_VERSION) + "\n";
-	if (server_version > 0)
-	{
-		std::string latest_version = "Latest Version: " + std::to_string(server_version) + "\n";
-		if (server_version > SSX_VERSION)
-		{
-			std::string message = "A new version of SimStreetsX exists!\nPlease download from www.streetsofsimcity.com\n\n";
-			message += this_version + latest_version;
-			ShowMessage("SimStreetsX Update", message);
-		}
-		else
-		{
-			std::string message = "You currently have the latest version of the SimStreetsX.\n\n";
-			message += this_version;
-			ShowMessage("SimStreetsX Update", message);
-		}
-	}
-	else
-	{
-		std::string message = "Unable to connect to www.streetsofsimcity.com.\n\n";
-		message += this_version;
-		ShowMessage("SimStreetsX Update", message);
-	}
 }
 
 

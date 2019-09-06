@@ -24,12 +24,14 @@ class SSXLoader
 public:
 	static bool VerifyInstallation();
 	static bool LoadFiles();	
-	static void CheckForUpdates();
 	static int GetPatchedSSXVersion();
 	static std::string GetStreetsGameLocation();
 	static bool CreatePatchedGame(std::string);
 	static bool StartSCX(int sleep_time, int resolution_mode, bool fullscreen);	
+	static const unsigned int SSX_VERSION = 1;
 private:
 	static bool InitializeGameData(std::string);
-	static bool GetFileCompatability(std::string);
+	static bool GetFileCompatability(std::string);	
 };
+
+//const int SSXLoader::SSX_VERSION = 1;
