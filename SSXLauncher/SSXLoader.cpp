@@ -1,11 +1,12 @@
 #include "SSXLoader.h"
 
 std::string LastErrorString();
-std::string GetResponseCode(LPCSTR);
 std::string CreateMD5Hash(std::string);
 std::vector<std::string> split_string(char delim, std::string split_string);
 MessageValue VerifyOriginalGame(std::string source);
-void SetGameDirectories(std::string full_exe_location);
+std::string FormatDirectoryLocation(std::string full_exe_location);
+MessageValue VerifyInstallationDirectory(std::string game_location);
+MessageValue VerifyInstallation();
 
 
 namespace
@@ -25,7 +26,8 @@ namespace
 
 	std::string SimStreetsXDirectory;
 	std::string SimStreetsGameLocation = "";
-	std::string SimStreetsGameRootDirectory = "";
+	std::string SimStreetsGameInstallDirectory = "";
+	bool ValidInstallation = false;
 
 	std::string patched_hash;
 	int patched_ssxversion = -1;
@@ -56,6 +58,11 @@ bool SSXLoader::GetFileCompatability(std::string game_location)
 int SSXLoader::GetPatchedSSXVersion()
 {
 	return patched_ssxversion;
+}
+
+bool SSXLoader::GetValidInstallation()
+{
+	return ValidInstallation;
 }
 
 std::string SSXLoader::GetStreetsGameLocation()
@@ -115,7 +122,9 @@ bool CreatePatchFile()
 	std::ofstream patch_stream(SCXDirectory(patch_file));
 	if (patch_stream.is_open())
 	{
-		patch_stream << hash_reference << "," << patched_ssxversion << "," << SimStreetsGameLocation << "," << static_cast<int>(game_version);
+		patch_stream << hash_reference << "," << patched_ssxversion << ",";
+		patch_stream << SimStreetsGameLocation << "," << static_cast<int>(game_version) << ",";
+		patch_stream << static_cast<int>(ValidInstallation);
 		patch_stream.close();
 		return true;
 	}
@@ -131,7 +140,7 @@ bool SSXLoader::InitializeGameData(std::string game_location)
 	return true;
 }
 
-bool SSXLoader::CreatePatchedGame(std::string game_location)
+bool SSXLoader::CreatePatchedGame(std::string game_location, bool verify_installation)
 {
 	OutputDebugString(std::string("Attempting to patch game at " + game_location + "\n").c_str());
 
@@ -145,7 +154,9 @@ bool SSXLoader::CreatePatchedGame(std::string game_location)
 	bool using_backup_copy = false;
 	MessageValue verifyCurrentValue;
 
-	if (!(verifyCurrentValue = VerifyOriginalGame(game_location)).Value)
+	std::string GameLocation = FormatDirectoryLocation(game_location);
+
+	if (!(verifyCurrentValue = VerifyOriginalGame(GameLocation)).Value)
 	{
 		if (!VerifyOriginalGame(SCXDirectory("Streets.exe")).Value)
 		{
@@ -160,13 +171,32 @@ bool SSXLoader::CreatePatchedGame(std::string game_location)
 	}
 	else
 	{
-		BOOL copy_result = CopyFileA(game_location.c_str(), SCXDirectory(game_file).c_str(), FALSE);
+		BOOL copy_result = CopyFileA(GameLocation.c_str(), SCXDirectory(game_file).c_str(), FALSE);
 		if (!copy_result)
 		{
 			ShowMessage(LastErrorString(), "Failed to copy the original game from the source location to the SimStreetsX directory.");
 			return false;
 		}
-	}	
+	}
+	
+	if (verify_installation)
+	{
+		MessageValue msg_verify;
+		if (!(msg_verify = VerifyInstallationDirectory(GameLocation)).Value)
+		{
+			ShowMessage("SimStreetsX Installation", msg_verify.Message);
+			return false;
+		}
+
+		MessageValue msg_install;
+		if (!(msg_install = VerifyInstallation()).Value)
+		{
+			ShowMessage("SimStreetsX Installation", msg_install.Message);
+			return false;
+		}
+
+		ValidInstallation = true;
+	}
 
 	BOOL copy_result2 = CopyFileA(SCXDirectory("Streets.exe").c_str(), SCXDirectory("SimStreetsX.exe").c_str(), FALSE);
 	if (!copy_result2)
@@ -187,15 +217,16 @@ bool SSXLoader::CreatePatchedGame(std::string game_location)
 		return false;
 	}
 
-	BOOL copy_result3 = CopyFileA(SCXDirectory("SimStreetsX.exe").c_str(), game_location.c_str(), FALSE);
+	SimStreetsGameLocation = verify_installation ? SimStreetsGameInstallDirectory + "Streets.exe" : GameLocation;
+
+	BOOL copy_result3 = CopyFileA(SCXDirectory("SimStreetsX.exe").c_str(), SimStreetsGameLocation.c_str(), FALSE);
 	if (!copy_result3)
 	{
 		ShowMessage(LastErrorString(), "Failed to copy the intermediary SimStreetsX patch game file to the source directory");
 		return false;
 	}
 
-	patched_ssxversion = SSX_VERSION;
-	SetGameDirectories(game_location);
+	patched_ssxversion = SSX_VERSION;	
 
 	BOOL delete_result = DeleteFileA(SCXDirectory("SimStreetsX.exe").c_str());
 	if (!delete_result)
@@ -217,7 +248,10 @@ bool SSXLoader::CreatePatchedGame(std::string game_location)
 		message += "Detected Version: " + version_description[game_version] + "\n";
 
 	message += "Patch location : \n" + game_location + "\n\n";
-	message += "If you modify or move this file, you will need to re-patch again.\n";
+	if (verify_installation)
+		message += "If you modify or move this file, you will need to re-patch again.\n";
+	else
+		message += "You patched this game without 'Verify Install', so you can't launch using SSXLauncher\n";
 
 	ShowMessage("SimStreetsX Patch Successful!", message);
 	return true;
@@ -229,6 +263,7 @@ void ClearPatchFile(std::string reason)
 	SimStreetsGameLocation = "";
 	patched_hash = -1;
 	patched_ssxversion = -1;
+	ValidInstallation = false;
 	BOOL delete_result = DeleteFileA(SCXDirectory(patch_file).c_str());
 	if (!delete_result)
 	{
@@ -236,18 +271,37 @@ void ClearPatchFile(std::string reason)
 	}
 }
 
-void SetGameDirectories(std::string full_exe_location)
+MessageValue VerifyInstallationDirectory(std::string game_location)
+{
+	//This is used for installing the game (if verify install is enabled)
+	std::vector<std::string> path = split_string('/', game_location);
+	SimStreetsGameInstallDirectory = "";
+
+	for (size_t i = path.size() - 2; i > 0; i--) //i - 1 = game exe
+	{
+		std::string path_check = "";
+		for (size_t j = 0; j < i + 1; j++)
+		{
+			path_check += path.at(j) + "/";
+		}
+		//The top-level directory should have autorun.inf
+		std::string auto_run = path_check + "autorun.inf";
+		OutputDebugString(std::string("Checking: " + auto_run + "\n").c_str());
+		if (PathFileExistsA(auto_run.c_str()))
+		{
+			SimStreetsGameInstallDirectory = path_check;
+			OutputDebugString(std::string("Install: " + SimStreetsGameInstallDirectory).append("\n").c_str());
+			return MessageValue(TRUE);
+		}
+	}
+	return MessageValue(FALSE, "The game does not appear to be on a valid extracted CD, missing autorun.inf");
+}
+
+std::string FormatDirectoryLocation(std::string full_exe_location)
 {
 	std::string format_location(full_exe_location);
 	std::replace(format_location.begin(), format_location.end(), '\\', '/');
-	std::vector<std::string> path = split_string('/', format_location);
-	SimStreetsGameLocation = format_location;
-	SimStreetsGameRootDirectory = "";
-	for(size_t i = 0; i < path.size() - 2; i++) //root dir is 2 up from full exe location
-	{
-		SimStreetsGameRootDirectory += path.at(i) + "/";
-	}
-	OutputDebugString(std::string(SimStreetsGameRootDirectory).append("\n").c_str());
+	return format_location;	
 }
 
 bool VerifyPatchedGame()
@@ -275,12 +329,18 @@ bool VerifyPatchedGame()
 	return true;
 }
 
-bool SSXLoader::StartSCX(int sleep_time, int resolution_mode, bool fullscreen)
+bool SSXLoader::StartSSX(int sleep_time, int resolution_mode, bool fullscreen)
 {
 
 	if (patched_ssxversion < 0) //This shouldn't happen because the button should not be enabled
 	{
 		ShowMessage("SimStreetsX Error", "You need to patch the game before starting.");
+		return false;
+	}
+	
+	if (!ValidInstallation) //This shouldn't happen because the button should not be enabled
+	{
+		ShowMessage("SimStreetsX Error", "You need to patch the game using 'Verify Install'");
 		return false;
 	}
 
@@ -359,12 +419,13 @@ bool SSXLoader::LoadFiles()
 			fin.getline(szBuff, 128);
 			fin.close();
 			std::vector<std::string> props = split_string(',', std::string(szBuff));
-			if (props.size() == 4)
+			if (props.size() == 5)
 			{
 				patched_hash = props.at(0);
 				patched_ssxversion = std::atoi(props.at(1).c_str());
-				SetGameDirectories(props.at(2));
+				SimStreetsGameLocation = props.at(2);				
 				game_version = static_cast<GameData::Version>(std::atoi(props.at(3).c_str()));
+				ValidInstallation = std::atoi(props.at(4).c_str());
 				OutputDebugString(std::string("Game is patched at: " + SimStreetsGameLocation + "\n").c_str());
 				OutputDebugString(std::string("Game version enum: " + std::to_string(static_cast<int>(game_version)) + "\n").c_str());
 			}
@@ -395,21 +456,6 @@ bool SSXLoader::LoadFiles()
 	return true;
 }
 
-std::string GetResponseCode(LPCSTR url)
-{
-	std::string request_fname = SCXDirectory("ssx_request");
-	char szBuff[128];
-	if (URLDownloadToFileA(NULL, url, request_fname.c_str(), 0, NULL) == S_OK)
-	{
-		std::ifstream fin(request_fname);
-		fin.getline(szBuff, 128);
-		fin.close();
-		DeleteFileA(request_fname.c_str());
-		std::string return_string(szBuff);
-		return return_string;
-	}
-	return std::string("");
-}
 
 std::string CreateMD5Hash(std::string filename_string)
 {
@@ -460,38 +506,14 @@ std::string CreateMD5Hash(std::string filename_string)
 	}
 }
 
-bool SSXLoader::VerifyInstallation()
-{
-	/*
-	std::string format_location(game_location);
-	std::replace(format_location.begin(), format_location.end(), '\\', '/');
-	std::transform(format_location.begin(), format_location.end(), format_location.begin(), ::tolower);
-	std::vector<std::string> vec_path = split_string('/', format_location);
-
-	bool invalid_path = vec_path.size() < 3 ||
-		vec_path.at(vec_path.size() - 1).compare("streets.exe") != 0 ||
-		vec_path.at(vec_path.size() - 2).compare("exe") != 0;
-
-	if (invalid_path)
-	{
-		ShowMessage("SimStreetsX Error", "The game you selected in not in a valid SimStreets install path. Please use '*exe/Streets.exe'");
-		return false;
-	}
-	*/
-
-
-
-	std::string format_location(SimStreetsGameRootDirectory);
-	std::replace(format_location.begin(), format_location.end(), '\\', '/');
-	//std::vector<std::string> path = split_string('/', format_location);
-
-	std::string shared_dir = format_location + "shared/";
-	std::string game_dir = format_location + "SimCopter/";
+MessageValue VerifyInstallation()
+{	
+	std::string shared_dir = SimStreetsGameInstallDirectory + "shared/";
+	std::string dest_dir = SimStreetsGameInstallDirectory;
 
 	if (!PathFileExistsA(shared_dir.c_str()))
 	{
-		OutputDebugString(std::string("[Verify Install] " + shared_dir + "does not exist\n").c_str());
-		return true;
+		return MessageValue(FALSE, "Directory does not exist:\n" + shared_dir);
 	}
 
 	std::vector<std::pair<std::string, std::string>> dll_pairs =
@@ -504,10 +526,13 @@ bool SSXLoader::VerifyInstallation()
 
 	for (std::pair<std::string, std::string> dll : dll_pairs)
 	{
-		std::string dll_dir = game_dir + dll.second;
+		std::string dll_dir = dest_dir + dll.second;
 		OutputDebugString(std::string("Checking for " + dll_dir + "\n").c_str());
-		if (PathFileExistsA(dll_dir.c_str())) //already exists, nothing to do
+		if (PathFileExistsA(dll_dir.c_str())) 
+		{
+			OutputDebugString(std::string(dll.second + " already exists in " + dll_dir + "\n").c_str());
 			continue;
+		}
 		std::string dll_copy = dll.first + dll.second;
 		if (!PathFileExistsA(dll_copy.c_str()))
 		{
@@ -522,7 +547,8 @@ bool SSXLoader::VerifyInstallation()
 		}
 		OutputDebugString(std::string("Copied " + dll_copy + " to: " + dll_dir + "\n").c_str());
 	}
-	return true;
+	
+	return MessageValue(TRUE);
 }
 
 std::vector<std::string> split_string(char delim, std::string split_string)

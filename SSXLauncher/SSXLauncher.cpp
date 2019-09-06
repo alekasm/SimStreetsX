@@ -50,7 +50,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	initialize(hInstance);
 
 	SSXLoader::LoadFiles();
-	if (SSXLoader::GetPatchedSSXVersion() > 0)
+	if (SSXLoader::GetPatchedSSXVersion() > 0 && SSXLoader::GetValidInstallation())
 	{
 		OutputDebugString("Streets of SimCity has been previously patched, ready to play \n");
 		Button_Enable(StartButton, TRUE);
@@ -268,16 +268,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 					ofn.lpstrInitialDir = NULL;
 					ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 					GetOpenFileName(&ofn);
-					bool patch_result = SSXLoader::CreatePatchedGame(ofn.lpstrFile);
-					if (patch_result)
-					{
-						bool verify_install = SendMessage(verifyCheckbox, BM_GETCHECK, 0, 0) == BST_CHECKED;
-						if (!verify_install || SSXLoader::VerifyInstallation())
-						{
-							Button_Enable(StartButton, TRUE);
-						}
-					}
-					Button_Enable(PatchButton, TRUE);				
+
+					bool verify_install = SendMessage(verifyCheckbox, BM_GETCHECK, 0, 0) == BST_CHECKED;
+					bool result = SSXLoader::CreatePatchedGame(ofn.lpstrFile, verify_install);
+					Button_Enable(StartButton, verify_install ? SSXLoader::GetValidInstallation() : result);
+					Button_Enable(PatchButton, TRUE);
 				}
 				else if ((HWND)lParam == StartButton)
 				{			
@@ -304,7 +299,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 					int dword_5017A8 = speedMS;
 					bool fullscreen = SendMessage(fsRadioButton, BM_GETCHECK, 0, 0) == BST_CHECKED;			
 					
-					if (SSXLoader::StartSCX(dword_5017A8, dword_5017D0, fullscreen))
+					//TODO Currently only Resolution 640x480 is supported
+					if (SSXLoader::StartSSX(dword_5017A8, 1, fullscreen))
 					{
 						end_process = true;
 					}
