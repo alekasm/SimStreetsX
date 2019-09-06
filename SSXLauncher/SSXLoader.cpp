@@ -358,7 +358,8 @@ bool SSXLoader::StartSSX(int sleep_time, int resolution_mode, bool fullscreen)
 	if (!fullscreen && !GetFileCompatability(SimStreetsGameLocation))
 	{
 		const char *message =
-			"You must run the Streets.exe in 8-bit color to use Windowed mode!\n\n"
+			"You must run the Streets.exe in 8-bit color to use Windowed mode!\n"
+			"Use the 'top-level' Streets.exe, NOT the exe/Streets.exe\n\n"
 			"1. Right Click Streets.exe -> Properties\n"
 			"2. Select the 'Compatibility' tab\n"
 			"3. Enable 'Reduced color mode' and select 8-bit/256 color\n"
@@ -509,6 +510,7 @@ std::string CreateMD5Hash(std::string filename_string)
 MessageValue VerifyInstallation()
 {	
 	std::string shared_dir = SimStreetsGameInstallDirectory + "shared/";
+	std::string exe_dir = SimStreetsGameInstallDirectory + "exe/";
 	std::string dest_dir = SimStreetsGameInstallDirectory;
 
 	if (!PathFileExistsA(shared_dir.c_str()))
@@ -521,7 +523,8 @@ MessageValue VerifyInstallation()
 		std::pair<std::string, std::string>(shared_dir, "glide2x.dll"),
 		std::pair<std::string, std::string>(shared_dir, "GLU32.dll"),
 		std::pair<std::string, std::string>(shared_dir, "OPENGL32.dll"),
-		std::pair<std::string, std::string>(shared_dir, "fxmemmap.vxd")
+		std::pair<std::string, std::string>(shared_dir, "fxmemmap.vxd"),
+		std::pair<std::string, std::string>(exe_dir, "SMACKW32.DLL")
 	};
 
 	for (std::pair<std::string, std::string> dll : dll_pairs)
