@@ -11,9 +11,9 @@
 class GameData
 {
 public:
-	enum FunctionType { MAIN_LOOP, CD_CHECK, DS_SLEEP, VERSIONS, RENDERER, RES_LOOKUP, GLOBAL_INIT };
+	enum FunctionType { MAIN_LOOP, CD_CHECK, DS_SLEEP, VERSIONS, RENDERER, RES_LOOKUP, GLOBAL_INIT, RENDER_GROUND_TEXTURES };
 
-	enum DWORDType { RENDERER_TYPE, MY_SLEEP, RES_TYPE };
+	enum DWORDType { RENDERER_TYPE, MY_SLEEP, RES_TYPE, SHOW_DEBUG };
 	enum Version { VERSION_1_0 };
 	static void initialize(PEINFO info);
 	static bool PatchGame(std::string game_exe, GameData::Version version);

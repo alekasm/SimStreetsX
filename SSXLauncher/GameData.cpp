@@ -65,7 +65,7 @@ void GameData::CreateRendererFunction(GameData::Version version)
 	master->instructions.push_back(instructions);
 
 	DWORD r_address = GameData::GetDWORDAddress(version, GameData::RENDERER_TYPE);
-	master->instructions.push_back(DataValue(r_address, 0x01));
+	master->instructions.push_back(DataValue(r_address, 0x00));
 }
 
 void GameData::CreateSleepFunction(GameData::Version version)
@@ -117,15 +117,15 @@ void GameData::initialize(PEINFO info)
 	version_classics.functions[DS_SLEEP] = 0xC53794;
 	version_classics.functions[CD_CHECK] = 0x5317F0;
 	version_classics.functions[RENDERER] = 0x470480;	
-
-	version_classics.global_dwords[RENDERER_TYPE] = 0x6906BC; //1 = Software, 0 = Glide	
+	
+	version_classics.global_dwords[RENDERER_TYPE] = 0x6906BC; //0 = Software, 1 = Glide, 2 = OpenGL	
+	version_classics.global_dwords[SHOW_DEBUG] = 0x5E7954; //1 = on, 0 = off, loc_4541C8
 
 	//---------- IN PROGRESS
 	version_classics.functions[VERSIONS] = 0x470F90;
-	version_classics.global_dwords[RES_TYPE] = 0x5E7898; //Default  = 1, 640x480
+	version_classics.global_dwords[RES_TYPE] = 0x5E7898; //Default = 1, 640x480
 	version_classics.functions[RES_LOOKUP] = 0x49C4C0;
 	version_classics.functions[GLOBAL_INIT] = 0x46F8A0;
-	
 
 	//---------- Below here contains completely new functions/variables
 	version_classics.global_dwords[MY_SLEEP] = master->base_location + 0x4;

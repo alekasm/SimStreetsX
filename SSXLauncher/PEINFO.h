@@ -1,6 +1,7 @@
 #pragma once
 #include <Windows.h>
 #include <map>
+#include <string>
 
 struct PEINFO
 {

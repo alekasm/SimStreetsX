@@ -140,7 +140,7 @@ bool Patcher::CreateDetourSection(const char *filepath, PEINFO *info)
 	info->data_map[name].VirtualSize = SH[new_size].Misc.VirtualSize;
 	
 	char buffer[256];
-	snprintf(buffer, sizeof(buffer), "Created .detour section at 0x%x\n", info->data_map[".detour"].VirtualAddress);
+	sprintf_s(buffer, sizeof(buffer), "Created .detour section at 0x%x\n", info->data_map[".detour"].VirtualAddress);
 	OutputDebugString(std::string(buffer).c_str());
 
 	BOOL result = CloseHandle(file);

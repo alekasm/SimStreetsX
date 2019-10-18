@@ -376,7 +376,7 @@ bool SSXLoader::StartSSX(int sleep_time, int resolution_mode, bool fullscreen)
 	CreatePatchFile();
 
 	std::string parameters = fullscreen ? "-f" : "-w";
-	parameters += " -o0"; //TODO figure out which global dwords this changes
+	//parameters += " -o0"; //TODO figure out which global dwords this changes
 	HINSTANCE hInstance = ShellExecuteA(NULL, "open", SimStreetsGameLocation.c_str(), parameters.c_str(), NULL, SW_SHOWDEFAULT);
 	int h_result = reinterpret_cast<int>(hInstance);
 	if (h_result <= 31)
