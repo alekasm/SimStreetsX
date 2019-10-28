@@ -1,0 +1,16 @@
+Below is a list of functions converted to pseudo code.
+The conversions may be simplified by omitting/repurposing registers.
+
+0x4AB38F:
+int height = dword_628438;
+int width = dword_628320;
+if(height > 999)
+{
+   height = 999;
+}
+int eax = height;
+for(int edi = 0; edi < height + 0x10; edi++)
+{
+   array_628444[edi] = eax;
+   eax += height;
+}

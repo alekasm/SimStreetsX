@@ -11,12 +11,23 @@ is meant to keep track of my findings regarding the engine.
 
 ----- Global Variables -----
 0xB27A58:
-Should Render World. 1 = false, 0 = true
+Should Render World. 0 = true, 1 = false
 
 0xA0B824:
 View Angle. 0 = cockpit, 1 - 5 = camera view outside
 Technically it's [0xA0B820 + 0x4] (unsure why this is in disassembly)
 
+
+Called in 4A9BA5:
+base (esi + offset)
+
+0x5E6A88 = menu model rendering base - variables not access directly so in IDA they are shown as undefined. They are dwords.
+0x5E6A90/A94 = menu model scale (keep at 640x480)
+0x5E6A9C/AA0 = menu model view resolution (width/height)
+
+0x5E7878 = game rendering base
+0x5E7880/884 = rendering area (width/height)
+0x5E788C/890 = rendering resolution (width/height)
 
 ----- High Resolution Issues -----
 
@@ -40,7 +51,7 @@ Resets various variables besed on time, currently on a 2000ms check. The "main
 variables" in this is 0x6293E4 and 0xB27A58. If both are not active, the other
 rendering functions return almost immediately.
 
-0x4AB410/0x4AB550:
+0x4AB410/0x4AB550 (not called in Single Player?):
 These functions have a very similar design except 
 
 0x4AB410 calls another function: 0x4ABC00
@@ -56,10 +67,31 @@ This function contains both the show_debug variable and 0x4B3B00, the function w
 3. Investigate why the skybox doesn't render the full width of the screen in high resolution, high textures - 
 however it renders correctly (full width) in high resolution, low, low/high textures.
 
+Apparently the calculation for skybox width/height = width (width), height (height-(width-360))
 
-4. The code is littered with hard-coded values for 640x480 and results in various UI problems and crashes in different
-parts of the code. One part is the game setup in function 0x453160. Correcting the width/height in this function
-helps with menu crashes, still needs testing.
+
+4. The menus are based off calcuations from the 0x5E6A88 menu model base, function 0x4AB38F for populating a vector
+of width values, and instructions that access the first index of the vector values:
+0x4C2C04 - I believe for the car lot (top-down)
+0x4B7B4C - I believe for the car view  (rotation)
+
+The solution is likely mixing the menu model offsets, the vector populator function, and the two instructions
+above (setting it statically to either 640 or some higher width)
+
+----- Game Problems -----
+
+Currently in the main rendering function (0x4AB7B0), an exception is sometimes thrown on the call to dword_B27A48 - 
+0x4AB7B0 + 1F6 (0x4AB9A6). This appears to be a call to a function pointer which can be some (but perhaps not all)
+of the following functions:
+
+0x4C3890
+0x4C4D58
+0x4B7A78
+
+The exception is thrown in 0x4B7A78 when there is an issue determining physics for your vehicle. I usually throw
+an exception here when I run my car into a light pole in a lot of other car props. Investigating the root cause of 
+this issue is difficult.
+
 
 
 
