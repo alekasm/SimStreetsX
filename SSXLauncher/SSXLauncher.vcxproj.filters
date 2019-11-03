@@ -80,5 +80,8 @@
     <Text Include="notes.txt">
       <Filter>Data</Filter>
     </Text>
+    <Text Include="funcs.txt">
+      <Filter>Data</Filter>
+    </Text>
   </ItemGroup>
 </Project>

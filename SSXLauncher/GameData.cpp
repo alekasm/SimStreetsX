@@ -16,6 +16,7 @@ bool GameData::PatchGame(std::string game_exe, GameData::Version version)
 	CreateSleepFunction(version);
 	CreateCDFunction(version);
 	CreateRendererFunction(version);
+	CreateRenderStaticDashFunction(version);
 	return Patcher::Patch(master->instructions, game_exe);
 }
 
@@ -68,6 +69,8 @@ void GameData::CreateRendererFunction(GameData::Version version)
 	master->instructions.push_back(DataValue(r_address, 0x00));
 }
 
+
+
 void GameData::CreateSleepFunction(GameData::Version version)
 {
 	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::MAIN_LOOP);
@@ -88,6 +91,59 @@ void GameData::CreateSleepFunction(GameData::Version version)
 	size_t is_size = instructions.GetInstructions().size();
 	master->SetLastDetourSize(is_size);
 	printf("[Main Loop Sleep] Generated a total of %d bytes\n", is_size);
+	master->instructions.push_back(instructions);
+}
+
+void GameData::CreateRenderStaticDashFunction(GameData::Version version)
+{
+	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::RENDER_STATIC_DASH);
+	DWORD renderw_address = GameData::GetDWORDAddress(version, GameData::RENDER_AREA_WIDTH);
+	DWORD renderh_address = GameData::GetDWORDAddress(version, GameData::RENDER_AREA_HEIGHT);
+	DWORD light2_address = GameData::GetDWORDAddress(version, GameData::LIGHT_2_PTR);
+
+	Instructions instructions(DWORD(function_entry + 0x5A7)); //0x59B = logic block
+	//mov eax, [light1_address]
+	//mov ecx, [eax+C]
+	//mov edx, [eax+8]
+	//push ecx
+	instructions << BYTE(0x52);	//push edx
+	instructions << ByteArray{ 0x8B, 0x15 }; 
+	instructions << renderh_address;	//mov edx, [render height address]
+	instructions << ByteArray{ 0x2B, 0xD1 }; // sub edx, ecx
+	instructions << ByteArray{ 0x6A, 0x00 }; //push 0
+	instructions << ByteArray{ 0x6A, 0x00 }; //push 0
+	instructions << BYTE(0x52);	//push edx (y)
+	instructions << ByteArray{ 0x6A, 0x00 }; // push 0 (x)
+	instructions << BYTE(0x55);	//push ebp
+	instructions << ByteArray{ 0x8B, 0xC8 }; //mov ecx, eax
+	instructions << ByteArray{ 0x8B, 0x18 }; //mov ebx, [eax]
+	instructions << ByteArray{ 0xFF, 0x53, 0x3C }; //call [ebx+3C]
+
+	instructions << BYTE(0xA1);
+	instructions << light2_address; //mov eax, [light2_address]
+	instructions << ByteArray{ 0x8B, 0x48, 0x0C }; //mov ecx, [eax+C]
+	instructions << ByteArray{ 0x8B, 0x50, 0x08 }; //mov edx, [eax+8]
+	instructions << BYTE(0x51); //push ecx
+	instructions << BYTE(0x52); //push edx
+	instructions << ByteArray{ 0x8B, 0x0D };
+	instructions << renderw_address; //mov ecx, [render width address]
+	instructions << ByteArray{ 0x8B, 0x15 };
+	instructions << renderh_address; //mov edx, [render height address]
+	instructions << ByteArray{ 0x2B, 0x50, 0x0C }; //sub edx, [eax+C]
+	instructions << ByteArray{ 0x2B, 0x48, 0x08 }; //sub ecx, [eax+8]
+	instructions << ByteArray{ 0x6A, 0x00 }; //push 0
+	instructions << ByteArray{ 0x6A, 0x00 }; //push 0
+	instructions << BYTE(0x52);	//push edx (y)
+	instructions << BYTE(0x51);	//push ecx (y)
+	instructions << BYTE(0x55);	//push ebp
+	instructions << ByteArray{ 0x8B, 0xC8 }; //mov ecx, eax
+	instructions << ByteArray{ 0x8B, 0x18 }; //mov ebx, [eax]
+	instructions << ByteArray{ 0xFF, 0x53, 0x3C }; //call [ebx+3C]
+	instructions << ByteArray{ 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 }; //nop padding
+
+	size_t is_size = instructions.GetInstructions().size();
+	master->SetLastDetourSize(is_size);
+	printf("[Render Static Dash] Generated a total of %d bytes\n", is_size);
 	master->instructions.push_back(instructions);
 }
 
@@ -117,9 +173,17 @@ void GameData::initialize(PEINFO info)
 	version_classics.functions[DS_SLEEP] = 0xC53794;
 	version_classics.functions[CD_CHECK] = 0x5317F0;
 	version_classics.functions[RENDERER] = 0x470480;	
+	version_classics.functions[RENDER_STATIC_DASH] = 0x453160;
 	
 	version_classics.global_dwords[RENDERER_TYPE] = 0x6906BC; //0 = Software, 1 = Glide, 2 = OpenGL	
 	version_classics.global_dwords[SHOW_DEBUG] = 0x5E7954; //1 = on, 0 = off, loc_4541C8
+	
+
+	version_classics.global_dwords[LIGHT_1_PTR] = 0x5E7970;
+	version_classics.global_dwords[LIGHT_2_PTR] = 0x5E7974;
+	version_classics.global_dwords[RENDER_AREA_WIDTH] = 0x5E7880;
+	version_classics.global_dwords[RENDER_AREA_HEIGHT] = 0x5E7884;
+
 
 	//---------- IN PROGRESS
 	version_classics.functions[VERSIONS] = 0x470F90;
