@@ -30,6 +30,7 @@ private:
 	static void CreateCDFunction(GameData::Version version);
 	static void CreateRendererFunction(GameData::Version version);
 	static void CreateRenderStaticDashFunction(GameData::Version version);
+	static void CreateGlobalInitFunction(GameData::Version version);
 };
 
 

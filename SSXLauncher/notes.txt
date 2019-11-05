@@ -17,6 +17,9 @@ Should Render World. 0 = true, 1 = false
 View Angle. 0 = cockpit, 1 - 5 = camera view outside
 Technically it's [0xA0B820 + 0x4] (unsure why this is in disassembly)
 
+0x5E79B0/4:
+Speedometer x/y values
+
 
 Called in 4A9BA5:
 base (esi + offset)
