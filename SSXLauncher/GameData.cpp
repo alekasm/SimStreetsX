@@ -18,6 +18,7 @@ bool GameData::PatchGame(std::string game_exe, GameData::Version version)
 	CreateRendererFunction(version);
 	CreateRenderStaticDashFunction(version);
 	CreateGlobalInitFunction(version);
+	CreateRenderDynamicDashFunction(version);
 	return Patcher::Patch(master->instructions, game_exe);
 }
 
@@ -146,6 +147,99 @@ void GameData::CreateRenderStaticDashFunction(GameData::Version version)
 	master->instructions.push_back(instructions);
 }
 
+void GameData::CreateRenderDynamicDashFunction(GameData::Version version)
+{
+	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::RENDER_DYNAMIC_DASH);
+	DWORD renderw_address = GameData::GetDWORDAddress(version, GameData::RENDER_AREA_WIDTH);
+	DWORD renderh_address = GameData::GetDWORDAddress(version, GameData::RENDER_AREA_HEIGHT);
+
+	/*
+	esi+6E = radar.x
+	esi+70 = radar.y
+	dword_6EF340 = timer.x
+	dword_6EF33C = timer.y
+	esi+4053E = health.x
+	esi+40540 = health.y
+	esi+38 = weapons.x
+	esi+3A = weapons.y
+	esi+3C = weapons slot amount
+	esi+40362 = fuel line length
+	esi+4036E = fuel.x
+	esi+40372 = fuel.y
+	esi+40396 = power line length
+	esi+403A2 = power.x
+	esi+403A6 = power.y
+	dword_5E79B0 = speedometer.x
+	dword_5E79B4 = speedometer.y
+
+	Unknowns:
+	esi+0C (bool)
+	esi+4036A
+	esi+40392 (power rotation?)
+	esi+4035E (fuel rotation?)
+	esi+4039E
+	*/
+
+	//TODO Replace static addresses for timer x/y, speedometer
+	//health, radar, and weapons use WORD, the rest use DWORD
+
+	Instructions instructions(DWORD(function_entry + 0x46));
+	instructions.jmp(master->GetNextDetour()); //jmp <detour> 
+
+	//Fill in all the x values first
+	instructions << BYTE(0xA1);
+	instructions << renderw_address; //mov eax, [render width]
+	instructions << ByteArray{ 0x83, 0xE8, 0x7A }; //sub eax, 0x7A
+	instructions << ByteArray{ 0x66, 0x89, 0x46, 0x6E }; //mov word ptr [esi+6E], ax
+	instructions << BYTE(0xA3);
+	instructions << DWORD(0x6EF340); //mov dword ptr [0x6EF340], eax
+	instructions << ByteArray{ 0x83, 0xE8, 0x61 }; //sub eax, 0x61
+	instructions << ByteArray{ 0x66, 0x89, 0x46, 0x38 }; //mov word ptr [esi+38], ax
+	instructions << ByteArray{ 0x83, 0xE8, 0x2D }; //sub eax, 0x2D
+	instructions << ByteArray{ 0x89, 0x86, 0xA2, 0x03, 0x04, 0x00 }; //mov dword ptr [esi+403A2], eax
+	instructions << ByteArray{ 0x83, 0xE8, 0x38 }; //sub eax, 0x38
+	instructions << ByteArray{ 0x89, 0x86, 0x6E, 0x03, 0x04, 0x00 }; //mov dword ptr [esi+4036E], eax
+	instructions << ByteArray{ 0x66, 0xC7, 0x86, 0x3E, 0x05, 0x04, 0x00, 0x0F, 0x00 }; //mov word ptr [esi+4053E], 0xF
+
+	//Fill in all the y values second
+	instructions << BYTE(0xA1);
+	instructions << renderh_address; //mov eax, [render height]
+	instructions << ByteArray{ 0x83, 0xE8, 0x1F }; //sub eax, 0x61
+	instructions << ByteArray{ 0x89, 0x86, 0x72, 0x03, 0x04, 0x00 }; //mov dword ptr [esi+40372], eax
+	instructions << ByteArray{ 0x89, 0x86, 0xA6, 0x03, 0x04, 0x00 }; //mov dword ptr [esi+403A6], eax
+	instructions << ByteArray{ 0x83, 0xE8, 0x0F }; //sub eax, 0xF
+	instructions << BYTE(0xA3);
+	instructions << DWORD(0x5E79B4); //mov dword ptr [0x5E79B4], eax
+	instructions << ByteArray{ 0x83, 0xE8, 0x38 }; //sub eax, 0x38
+	instructions << ByteArray{ 0x66, 0x89, 0x46, 0x70 }; //mov word ptr [esi+70], ax
+	instructions << ByteArray{ 0x83, 0xE8, 0x02 }; //sub eax, 0x2
+	instructions << ByteArray{ 0x66, 0x89, 0x46, 0x3A }; //mov word ptr [esi+70], ax
+	instructions << ByteArray{ 0x83, 0xE8, 0x13 }; //sub eax, 0x13
+	instructions << ByteArray{ 0x66, 0x89, 0x86, 0x40, 0x05, 0x04, 0x00 }; //mov word ptr [esi+40540], ax
+	instructions << ByteArray{ 0x83, 0xE8, 0x06 }; //sub eax, 0x06
+	instructions << BYTE(0xA3);
+	instructions << DWORD(0x6EF33C); //mov dword ptr [0x6EF33C], eax
+
+	//set fuel length, power length, and weapon slot amount
+	instructions << ByteArray{ 0x66, 0xC7, 0x46, 0x3C, 0x03, 0x00 }; //mov word ptr [esi+3C], 3
+	instructions << ByteArray{ 0xC7, 0x86, 0x62, 0x03, 0x04, 0x00, 0x13, 0x00, 0x00, 0x00 }; //mov [esi+40362], 0x13
+	instructions << ByteArray{ 0xC7, 0x86, 0x96, 0x03, 0x04, 0x00, 0x13, 0x00, 0x00, 0x00 }; //mov [esi+40362], 0x13
+
+	//set the unknowns
+	instructions << ByteArray{ 0xC7, 0x86, 0x5E, 0x03, 0x04, 0x00, 0x96, 0x00, 0x00, 0x00 }; //mov [esi+4035E], 0x96
+	instructions << ByteArray{ 0xC7, 0x86, 0x92, 0x03, 0x04, 0x00, 0x96, 0x00, 0x00, 0x00 }; //mov [esi+40392], 0x96
+	instructions << ByteArray{ 0xC7, 0x86, 0x6A, 0x03, 0x04, 0x00, 0x9A, 0x99, 0x99, 0x3F }; //mov [esi+4036A], 0x3F99999A
+	instructions << ByteArray{ 0xC7, 0x86, 0x9E, 0x03, 0x04, 0x00, 0x9A, 0x99, 0x99, 0x3F }; //mov [esi+4039E], 0x3F99999A
+
+	instructions << BYTE(0x5E); //pop esi
+	instructions << ByteArray{ 0xC2, 0x04, 0x00 }; //ret 4
+
+	size_t is_size = instructions.GetInstructions().size();
+	master->SetLastDetourSize(is_size);
+	printf("[Render Dynamic Dash] Generated a total of %d bytes\n", is_size);
+	master->instructions.push_back(instructions);
+}
+
 
 void GameData::CreateGlobalInitFunction(GameData::Version version)
 {
@@ -157,8 +251,6 @@ void GameData::CreateGlobalInitFunction(GameData::Version version)
 	DWORD renderh_address = GameData::GetDWORDAddress(version, GameData::RENDER_AREA_HEIGHT);
 
 
-	//The detour function:
-	//46f92a
 	Instructions instructions(DWORD(function_entry + 0x90));
 	instructions.jmp(master->GetNextDetour()); //jmp <detour> 
 	instructions << ByteArray{ 0x8D, 0x05 };
@@ -229,6 +321,7 @@ void GameData::initialize(PEINFO info)
 	version_classics.functions[RENDERER] = 0x470480;	
 	version_classics.functions[RENDER_STATIC_DASH] = 0x453160;
 	version_classics.functions[GLOBAL_INIT] = 0x46F8A0;
+	version_classics.functions[RENDER_DYNAMIC_DASH] = 0x450F40;
 	
 	version_classics.global_dwords[RENDERER_TYPE] = 0x6906BC; //0 = Software, 1 = Glide, 2 = OpenGL	
 	version_classics.global_dwords[SHOW_DEBUG] = 0x5E7954; //1 = on, 0 = off, loc_4541C8

@@ -13,7 +13,7 @@ class GameData
 public:
 	enum FunctionType { MAIN_LOOP, CD_CHECK, DS_SLEEP,
 						VERSIONS, RENDERER, RES_LOOKUP, 
-						GLOBAL_INIT, RENDER_STATIC_DASH };
+						GLOBAL_INIT, RENDER_STATIC_DASH, RENDER_DYNAMIC_DASH };
 
 	enum DWORDType { RENDERER_TYPE, MY_SLEEP, RES_TYPE, SHOW_DEBUG, 
 					 LIGHT_1_PTR, LIGHT_2_PTR, RENDER_AREA_WIDTH, RENDER_AREA_HEIGHT };
@@ -30,6 +30,7 @@ private:
 	static void CreateCDFunction(GameData::Version version);
 	static void CreateRendererFunction(GameData::Version version);
 	static void CreateRenderStaticDashFunction(GameData::Version version);
+	static void CreateRenderDynamicDashFunction(GameData::Version version);
 	static void CreateGlobalInitFunction(GameData::Version version);
 };
 
