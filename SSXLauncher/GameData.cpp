@@ -19,6 +19,7 @@ bool GameData::PatchGame(std::string game_exe, GameData::Version version)
 	CreateRenderStaticDashFunction(version);
 	CreateGlobalInitFunction(version);
 	CreateRenderDynamicDashFunction(version);
+	CreateMenuInitFunction(version);
 	return Patcher::Patch(master->instructions, game_exe);
 }
 
@@ -240,6 +241,28 @@ void GameData::CreateRenderDynamicDashFunction(GameData::Version version)
 	master->instructions.push_back(instructions);
 }
 
+void GameData::CreateMenuInitFunction(GameData::Version version)
+{
+	/*
+		Originally this function checked the resolution type and populated a master menu object with
+		fields corresponding to the same values in Resolution Lookup (0x5E7954). I'm not sure why
+		they didn't just call the resolution lookup function instead of doing the identical check again.
+		In this case we do NOT want to do a resolution lookup, we want the resolution of the menus to always
+		be 640x480. It appears this part of the code was written with multiple resolutions in mind, however
+		it wasn't tested/working fully. 
+	*/
+	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::MENU_INIT);
+
+	Instructions instructions(DWORD(function_entry + 0x176));
+	instructions << ByteArray{ 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 }; //nops out cmp dword_5e7898, 1
+	instructions << ByteArray{ 0x90, 0x90 }; //nops out jnz short loc_42e9F7
+
+	size_t is_size = instructions.GetInstructions().size();
+	master->SetLastDetourSize(is_size);
+	printf("[Menu Initialization] Generated a total of %d bytes\n", is_size);
+	master->instructions.push_back(instructions);
+}
+
 
 void GameData::CreateGlobalInitFunction(GameData::Version version)
 {
@@ -268,9 +291,9 @@ void GameData::CreateGlobalInitFunction(GameData::Version version)
 	instructions << ByteArray{ 0x89, 0x8E, 0x8A, 0x4B, 0x00, 0x00 }; //mov [esi+4B8A], ecx
 	instructions << ByteArray{ 0x89, 0xBE, 0x8E, 0x4B, 0x00, 0x00 }; //mov [esi+4B8E], edi 
 
-	instructions << ByteArray{ 0x89, 0x86, 0x92, 0x4B, 0x00, 0x00 }; //mov [esi+4B92], eax 	
-	instructions << ByteArray{ 0x89, 0x8E, 0x96, 0x4B, 0x00, 0x00 }; //mov [esi+4B96], ecx
-	instructions << ByteArray{ 0x89, 0xBE, 0x9A, 0x4B, 0x00, 0x00 }; //mov [esi+4B9A], edi 
+	instructions << ByteArray{ 0x89, 0x86, 0x92, 0x4B, 0x00, 0x00 }; //mov [esi+4B92], eax 	//physical screen width
+	instructions << ByteArray{ 0x89, 0x8E, 0x96, 0x4B, 0x00, 0x00 }; //mov [esi+4B96], ecx  //physical screen height
+	instructions << ByteArray{ 0x89, 0xBE, 0x9A, 0x4B, 0x00, 0x00 }; //mov [esi+4B9A], edi  //color depth
 
 	instructions << ByteArray{ 0xC7, 0x86, 0x6A, 0x4B, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00 }; //mov [esi + 4B6A], 1
 	instructions << ByteArray{ 0xC7, 0x86, 0xB6, 0x4B, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00 }; //mov [esi + 4BB6], 1
@@ -322,6 +345,8 @@ void GameData::initialize(PEINFO info)
 	version_classics.functions[RENDER_STATIC_DASH] = 0x453160;
 	version_classics.functions[GLOBAL_INIT] = 0x46F8A0;
 	version_classics.functions[RENDER_DYNAMIC_DASH] = 0x450F40;
+	version_classics.functions[MENU_INIT] = 0x42E860;
+	version_classics.functions[RES_LOOKUP] = 0x49C4C0;
 	
 	version_classics.global_dwords[RENDERER_TYPE] = 0x6906BC; //0 = Software, 1 = Glide, 2 = OpenGL	
 	version_classics.global_dwords[SHOW_DEBUG] = 0x5E7954; //1 = on, 0 = off, loc_4541C8
@@ -331,12 +356,10 @@ void GameData::initialize(PEINFO info)
 	version_classics.global_dwords[LIGHT_2_PTR] = 0x5E7974;
 	version_classics.global_dwords[RENDER_AREA_WIDTH] = 0x5E7880;
 	version_classics.global_dwords[RENDER_AREA_HEIGHT] = 0x5E7884;
-
+	version_classics.global_dwords[RES_TYPE] = 0x5E7898; //Default = 1, 640x480
 
 	//---------- IN PROGRESS
-	version_classics.functions[VERSIONS] = 0x470F90;
-	version_classics.global_dwords[RES_TYPE] = 0x5E7898; //Default = 1, 640x480
-	version_classics.functions[RES_LOOKUP] = 0x49C4C0;	
+	version_classics.functions[VERSIONS] = 0x470F90;	
 
 	//---------- Below here contains completely new functions/variables
 	version_classics.global_dwords[MY_SLEEP] = master->base_location + 0x4;
