@@ -14,3 +14,18 @@ for(int edi = 0; edi < height + 0x10; edi++)
    array_628444[edi] = eax;
    eax += height;
 }
+
+------------------------------------------------
+
+0x519C10(char* image_location)
+returns pointer to image data
++0x8 = width
++0xC = height
++0x1C = 0
++0x20 = 0
++0x24 = width
++0x28 = height
++0x64 = 7
++0x68 = height
++0x6C = width
++0xC8 = 2112

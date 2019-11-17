@@ -95,7 +95,43 @@ The exception is thrown in 0x4B7A78 when there is an issue determining physics f
 an exception here when I run my car into a light pole in a lot of other car props. Investigating the root cause of 
 this issue is difficult.
 
+----- Dash UI In Progress -----
+Location 450C1A loads the actual bmp files whereas Location 452940/4529AF loads the associated folder.
+Potentially create new folders and graphics depending on high resolution mode or not?
+
+Images are loaded using function: 0x519C10(char* image_location)
+The returned results are detailed in funcs.txt
+
+It is possible to modify the width of images to be the width of the game if its bigger then the screen
+width. This would prevent the images from not loading if they are bigger, ie if we choose a dash UI view
+thats 5000px wide on an 800x600 resolution.
+
+The image data pointer is later accessed at addresses 0x450EF6 and 0x51AFA9 - both at the same frequency.
+
+ecx+0x13 is compared against esi (the number of images to load for the dash set). 
+For instance sedf loads 3 images (sedf0, sedf1, sedf2). 
 
 
+----- Menu UI In Progress -----
+The menus need to still be rendered in 640x480. There appears to be a static struct pointer that gets passed around to various functions containing
+the width/height for menus to render in. Since the value has changed since I started work, this means one of the values I defined is later copied
+into this structure.
+
+Getting this struct pointer can be done in a few ways; the most "root" approach is by breaking on sub_517AD0 and grabbing the address loaded into ebx,
+[esp+0xC+arg_0] (or esp+0x10). Later functions refer to this as unk_(697D08+0x14) and (unk_697D1C). I'm not sure why these static data pointers are populated
+since they are only ever seem to be updated from the root call stack (517AD0). 
+
+anon_struct
+{
++0x18 = width menu render? (change this to 640)
++0x1C = height menu render? (change this to 480)
++0x28 = width (doesnt matter?)
++0x2C = height (doesnt matter?)
+}
+
+
+----- Other -----
+
+sub_516BB0(void) is a "screen refresh" by performing a PeekMessage/TranslateMessage/DispatchMessage routine.
 
 4A3680 = voodoo rush patch version?
