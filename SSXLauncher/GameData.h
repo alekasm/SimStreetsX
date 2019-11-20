@@ -14,9 +14,9 @@ public:
 	enum FunctionType { MAIN_LOOP, CD_CHECK, DS_SLEEP,
 						VERSIONS, RENDERER, RES_LOOKUP, 
 						GLOBAL_INIT, RENDER_STATIC_DASH, RENDER_DYNAMIC_DASH,
-						MENU_INIT };
+						MENU_INIT, INITIALIZE_SKYBOX, RENDER_SKYBOX, CALL_INIT_SKYBOX };
 
-	enum DWORDType { RENDERER_TYPE, MY_SLEEP, RES_TYPE, SHOW_DEBUG, 
+	enum DWORDType { RENDERER_TYPE, MY_SLEEP, SKYBOX_HEIGHT, RES_TYPE, SHOW_DEBUG, 
 					 LIGHT_1_PTR, LIGHT_2_PTR, RENDER_AREA_WIDTH, RENDER_AREA_HEIGHT };
 
 	enum Version { VERSION_1_0 };
@@ -34,6 +34,8 @@ private:
 	static void CreateRenderDynamicDashFunction(GameData::Version version);
 	static void CreateGlobalInitFunction(GameData::Version version);
 	static void CreateMenuInitFunction(GameData::Version version);
+
+	static void CreateInitSkyboxFunction(GameData::Version version);
 };
 
 

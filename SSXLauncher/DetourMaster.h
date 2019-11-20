@@ -40,7 +40,7 @@ struct DetourMaster
 	void SetLastDetourSize(size_t size)
 	{
 		//Technically this includes instructions outside of the detour but who cares
-		current_location += (size % 4) + size;
+		current_location += (size - (size % 4)) + 4;
 	}
 	std::vector<Instructions> instructions;
 };

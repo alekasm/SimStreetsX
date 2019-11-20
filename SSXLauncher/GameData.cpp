@@ -20,6 +20,7 @@ bool GameData::PatchGame(std::string game_exe, GameData::Version version)
 	CreateGlobalInitFunction(version);
 	CreateRenderDynamicDashFunction(version);
 	CreateMenuInitFunction(version);
+	CreateInitSkyboxFunction(version);
 	return Patcher::Patch(master->instructions, game_exe);
 }
 
@@ -272,6 +273,7 @@ void GameData::CreateGlobalInitFunction(GameData::Version version)
 	//get overwritten by themselves (as a result of this patch).
 	DWORD renderw_address = GameData::GetDWORDAddress(version, GameData::RENDER_AREA_WIDTH);
 	DWORD renderh_address = GameData::GetDWORDAddress(version, GameData::RENDER_AREA_HEIGHT);
+	DWORD skyboxh_address = GameData::GetDWORDAddress(version, GameData::SKYBOX_HEIGHT);
 
 
 	Instructions instructions(DWORD(function_entry + 0x90));
@@ -299,6 +301,16 @@ void GameData::CreateGlobalInitFunction(GameData::Version version)
 	instructions << ByteArray{ 0xC7, 0x86, 0xB6, 0x4B, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00 }; //mov [esi + 4BB6], 1
 	instructions << ByteArray{ 0xC7, 0x86, 0xF6, 0x4B, 0x00, 0x00, 0x00, 0x00, 0x20, 0x41 }; //mov [esi + 4BF6], 41200000
 
+	//Skybox height calculation
+	instructions << BYTE(0x50); //push eax
+	instructions << ByteArray{ 0x8B, 0xC8 }; //mov ecx, eax
+	instructions << ByteArray{ 0x33, 0xD2 }; //xor edx, edx
+	instructions << ByteArray{ 0xB8, 0x00, 0xF4, 0x01, 0x00 }; //mov eax, 1F400 (128K)
+	instructions << ByteArray{ 0xF7, 0xF1 }; //div ecx
+	instructions << BYTE(0xA3);
+	instructions << skyboxh_address; //mov skybox_address, eax
+	instructions << BYTE(0x58); //pop eax
+
 	instructions << BYTE(0x55); //push ebp
 	instructions << ByteArray{ 0x8D, 0x86, 0x9E, 0x4B, 0x00, 0x00 }; //lea eax, [esi+4B9E]
 	instructions << BYTE(0x50); //push eax
@@ -313,6 +325,37 @@ void GameData::CreateGlobalInitFunction(GameData::Version version)
 	master->SetLastDetourSize(is_size);
 	printf("[Global Initialization] Generated a total of %d bytes\n", is_size);
 	//printf("DetourMaster now points to address starting at %x\n", master->current_location);
+	master->instructions.push_back(instructions);
+}
+
+void GameData::CreateInitSkyboxFunction(GameData::Version version)
+{
+	/*
+	Unfortunately this function was coded poorly. It takes in 3 arguments:
+	sub_54C780(dword_5E7820, skybox_width, skybox_height) and is only called in one location (0x4a1BC4).
+	Even though it takes in the skybox width/height as parameters, it still manually assigns a hardcoded
+	skybox width and height. 
+
+	This patch corrects this logic by properly using the function arguments...
+
+	*/
+
+	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::INITIALIZE_SKYBOX);
+
+	Instructions instructions(DWORD(function_entry + 0x42));
+	DWORD next_detour = master->GetNextDetour();
+	instructions.jmp(next_detour, FALSE); //jmp <detour> 
+	instructions.nop(15); //clears the next 15 bytes to clean up debugging
+	instructions.relocate(next_detour);
+	instructions << ByteArray{ 0x8B, 0x45, 0x0C }; //mov eax, [ebp+0xC] (sky width arg)
+	instructions << ByteArray{ 0x89, 0x86, 0x3C, 0x01, 0x00, 0x00 }; //mov [esi+0x13C], eax
+	instructions << ByteArray{ 0x8B, 0x45, 0x10 }; //mov eax, [ebp+0x10] (sky height arg)
+	instructions << ByteArray{ 0x89, 0x86, 0x40, 0x01, 0x00, 0x00 }; //mov [esi+0x140], eax
+	instructions.jmp(function_entry + 0x56); //jmp back
+
+	size_t is_size = instructions.GetInstructions().size();
+	master->SetLastDetourSize(is_size);
+	printf("[Skybox Initialization] Generated a total of %d bytes\n", is_size);
 	master->instructions.push_back(instructions);
 }
 
@@ -347,6 +390,8 @@ void GameData::initialize(PEINFO info)
 	version_classics.functions[RENDER_DYNAMIC_DASH] = 0x450F40;
 	version_classics.functions[MENU_INIT] = 0x42E860;
 	version_classics.functions[RES_LOOKUP] = 0x49C4C0;
+
+	version_classics.functions[INITIALIZE_SKYBOX] = 0x54C780;
 	
 	version_classics.global_dwords[RENDERER_TYPE] = 0x6906BC; //0 = Software, 1 = Glide, 2 = OpenGL	
 	version_classics.global_dwords[SHOW_DEBUG] = 0x5E7954; //1 = on, 0 = off, loc_4541C8
@@ -363,6 +408,7 @@ void GameData::initialize(PEINFO info)
 
 	//---------- Below here contains completely new functions/variables
 	version_classics.global_dwords[MY_SLEEP] = master->base_location + 0x4;
+	version_classics.global_dwords[SKYBOX_HEIGHT] = master->base_location + 0x8;
 	games[VERSION_1_0] = version_classics;
 
 }

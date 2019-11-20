@@ -63,15 +63,13 @@ These functions have a very similar design except
 Both functions have some check against the number "15000"
 
 0x4AB7B0:
-Seems to be the "main" rendering function of sorts, and it's the only function that willa ctually reset 0x6293E4. 
+Seems to be the "main" rendering function of sorts, and it's the only function that will actually reset 0x6293E4. 
 This function contains both the show_debug variable and 0x4B3B00, the function which crashes on higher resolutions.
 
-
-3. Investigate why the skybox doesn't render the full width of the screen in high resolution, high textures - 
-however it renders correctly (full width) in high resolution, low, low/high textures.
-
-Apparently the calculation for skybox width/height = width (width), height (height-(width-360))
-
+3. Skybox
+The skybox uses a 128K buffer. By default the skybox is 640x200 (128K). The wider you make the game screen, the less
+height you can have for your skybox because it will begin to use more of the buffer. For instance on a 16:9 resolution
+using 1600x900, the max height for the skybox can be 128k/1600 = 80px.
 
 4. The menus are based off calcuations from the 0x5E6A88 menu model base, function 0x4AB38F for populating a vector
 of width values, and instructions that access the first index of the vector values:

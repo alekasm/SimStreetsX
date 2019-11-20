@@ -62,6 +62,12 @@ public:
 			current_location = address;
 	}
 
+	void nop(size_t amount)
+	{
+		for (size_t i = 0; i < amount; i++)
+			operator<<(BYTE(0x90));
+	}
+
 	void jmp(DWORD address)
 	{
 		jmp(address, TRUE);
