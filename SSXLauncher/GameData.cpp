@@ -21,6 +21,7 @@ bool GameData::PatchGame(std::string game_exe, GameData::Version version)
 	CreateRenderDynamicDashFunction(version);
 	CreateMenuInitFunction(version);
 	CreateInitSkyboxFunction(version);
+	CreateSkyboxArgumentFunction(version);
 	return Patcher::Patch(master->instructions, game_exe);
 }
 
@@ -211,7 +212,7 @@ void GameData::CreateRenderDynamicDashFunction(GameData::Version version)
 	instructions << ByteArray{ 0x89, 0x86, 0xA6, 0x03, 0x04, 0x00 }; //mov dword ptr [esi+403A6], eax
 	instructions << ByteArray{ 0x83, 0xE8, 0x0F }; //sub eax, 0xF
 	instructions << BYTE(0xA3);
-	instructions << DWORD(0x5E79B4); //mov dword ptr [0x5E79B4], eax
+	instructions << DWORD(0x5E79B4); //mov dword ptr [0x5E79B4], eax (TODO REPLACE STATIC ADDR)
 	instructions << ByteArray{ 0x83, 0xE8, 0x38 }; //sub eax, 0x38
 	instructions << ByteArray{ 0x66, 0x89, 0x46, 0x70 }; //mov word ptr [esi+70], ax
 	instructions << ByteArray{ 0x83, 0xE8, 0x02 }; //sub eax, 0x2
@@ -359,6 +360,69 @@ void GameData::CreateInitSkyboxFunction(GameData::Version version)
 	master->instructions.push_back(instructions);
 }
 
+void GameData::CreateSkyboxArgumentFunction(GameData::Version version)
+{
+	/*
+	Since the arguments for the skybox width/height are hardcoded multiple times in various functions,
+	a new function (not a detour) is created which will serve as an argument populator.
+
+	Example Previous 1: SomeSkyboxFunctionA(bool a, DWORD_PTR b, int sky_width, int sky_height)
+	Example Previous 2: SomeOtherSkyboxFunctionB(int sky_width, int sky_height, int c)
+
+	Example New 1: SomeSkyboxFunctionA(bool a, DWORD_PTR b, MySkyboxFunction())
+	Example New 2: SomeOtherSkyboxFunctionB(MySkyboxFunction(), int c)
+
+	The code is the same, however I opted not to create a jump detour like usual because
+	the return address would be different - which means that a jump detour requires
+	two of the same detour but with different return addresses (hence using a call instead).
+	*/
+		
+	DWORD skybox_height = GameData::GetDWORDAddress(version, GameData::SKYBOX_HEIGHT);
+	DWORD render_width = GameData::GetDWORDAddress(version, GameData::RENDER_AREA_WIDTH);
+
+	//This function will occupy both eax and ecx
+	DWORD skybox_arg_func = master->GetNextDetour();
+	Instructions instructions(skybox_arg_func);
+	instructions << BYTE(0x58); //pop eax
+	instructions << ByteArray{ 0x8B, 0x0D };
+	instructions << skybox_height; //mov ecx, skybox_height
+	instructions << BYTE(0x51); //push ecx
+	instructions << ByteArray{ 0x8B, 0x0D };
+	instructions << render_width; //mov ecx, render_width
+	instructions << BYTE(0x51); //push ecx
+	instructions << BYTE(0x50); //push eax
+	instructions << BYTE(0xC3); //ret
+
+	size_t is_size = instructions.GetInstructions().size();
+	master->SetLastDetourSize(is_size);
+	printf("[Skybox Arguments] Generated a total of %d bytes\n", is_size);
+	master->instructions.push_back(instructions);	
+
+	DWORD render_skybox = GameData::GetFunctionAddress(version, GameData::RENDER_SKYBOX);
+	Instructions is_rs(DWORD(render_skybox + 0x17));
+	//Changing eax to ebx because we use eax in the skybox arg function
+	is_rs << ByteArray{ 0x8B, 0x5C, 0x24, 0x08 }; //mov ebx, [esp+0x8]
+	//is_rs << BYTE(0xE8);
+	//is_rs << skybox_arg_func; //call skybox arg func
+	is_rs.call(skybox_arg_func);
+	is_rs.nop(5); //clean up for debuggers
+	is_rs.relocate(DWORD(render_skybox + 0x2F));
+	is_rs << BYTE(0x53); //push ebx
+	master->instructions.push_back(is_rs);
+	printf("[Render Skybox] Generated a total of %d bytes\n", is_rs.GetInstructions().size());
+
+	DWORD call_init_skybox = GameData::GetFunctionAddress(version, GameData::CALL_INIT_SKYBOX);
+	Instructions is_cis(DWORD(call_init_skybox + 0x42));
+	is_cis.nop(5); //Clean up for debuggers
+	is_cis.call(skybox_arg_func);
+	//is_cis << BYTE(0xE8);
+	//is_cis << skybox_arg_func; //call skybox_arg_func
+	is_cis << BYTE(0xA1);
+	is_cis << DWORD(0x5E7820); // mov eax, [5E7820] (TODO REPLACE STATIC ADDR)
+	master->instructions.push_back(is_cis);
+	printf("[Call Init Skybox] Generated a total of %d bytes\n", is_cis.GetInstructions().size());
+}
+
 DWORD GameData::GetFunctionAddress(Version version, FunctionType ftype)
 {
 	return games[version].functions[ftype];
@@ -392,6 +456,9 @@ void GameData::initialize(PEINFO info)
 	version_classics.functions[RES_LOOKUP] = 0x49C4C0;
 
 	version_classics.functions[INITIALIZE_SKYBOX] = 0x54C780;
+	version_classics.functions[RENDER_SKYBOX] = 0x54CB70;
+	version_classics.functions[CALL_INIT_SKYBOX] = 0x4A1B70;
+
 	
 	version_classics.global_dwords[RENDERER_TYPE] = 0x6906BC; //0 = Software, 1 = Glide, 2 = OpenGL	
 	version_classics.global_dwords[SHOW_DEBUG] = 0x5E7954; //1 = on, 0 = off, loc_4541C8

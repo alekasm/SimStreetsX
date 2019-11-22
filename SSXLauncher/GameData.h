@@ -34,7 +34,7 @@ private:
 	static void CreateRenderDynamicDashFunction(GameData::Version version);
 	static void CreateGlobalInitFunction(GameData::Version version);
 	static void CreateMenuInitFunction(GameData::Version version);
-
+	static void CreateSkyboxArgumentFunction(GameData::Version version);
 	static void CreateInitSkyboxFunction(GameData::Version version);
 };
 
