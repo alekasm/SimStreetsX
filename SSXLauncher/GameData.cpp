@@ -23,6 +23,7 @@ bool GameData::PatchGame(std::string game_exe, GameData::Version version)
 	CreateInitSkyboxFunction(version);
 	CreateSkyboxArgumentFunction(version);
 	CreateMenusFunction(version);
+	CreateNoDashFunction(version);
 	return Patcher::Patch(master->instructions, game_exe);
 }
 
@@ -462,6 +463,35 @@ void GameData::CreateSkyboxArgumentFunction(GameData::Version version)
 	is_cis << DWORD(0x5E7820); // mov eax, [5E7820] (TODO REPLACE STATIC ADDR)
 	master->instructions.push_back(is_cis);
 	printf("[Call Init Skybox] Generated a total of %d bytes\n", is_cis.GetInstructions().size());
+}
+
+void GameData::CreateNoDashFunction(GameData::Version version)
+{
+	/*
+	This patch uses the 3rd person UI elements on resolutions > 640x480, luckily it preserves the 
+	rear-view mirror.
+	*/
+
+	DWORD check_cockpit_func = master->GetNextDetour();
+	Instructions instructions(check_cockpit_func);
+	instructions << ByteArray{ 0xB8, 0x80, 0x02, 0x00, 0x00 }; //mov eax, 0x280
+	instructions << ByteArray{ 0x39, 0x05 };
+	instructions << GameData::GetDWORDAddress(version, GameData::RENDER_AREA_WIDTH); // cmp [width], eax
+	instructions << ByteArray{ 0x74, 0x0C }; //jz 0xC
+	instructions << ByteArray{ 0xB8, 0x01, 0x00, 0x00, 0x00 }; //mov eax, 1
+	instructions << ByteArray{ 0x89, 0x81, 0x32, 0x05, 0x04, 0x00 }; //mov [ecx+0x40532], eax
+	instructions << BYTE(0xC3); //ret
+	instructions << ByteArray{ 0x8B, 0x81, 0x32, 0x05, 0x04, 0x00 }; //mov eax, [ecx+0x40532]
+	instructions << BYTE(0xC3);
+
+	master->SetLastDetourSize(instructions.GetInstructions().size());
+
+	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::RENDER_STATIC_DASH);
+	instructions.relocate(DWORD(function_entry + 0x589));
+	instructions.call(check_cockpit_func);
+
+	master->instructions.push_back(instructions);
+	printf("[Create No-Dash (Hi-Res)] Generated a total of %d bytes\n", instructions.GetInstructions().size());
 }
 
 DWORD GameData::GetFunctionAddress(Version version, FunctionType ftype)

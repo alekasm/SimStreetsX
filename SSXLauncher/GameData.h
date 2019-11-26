@@ -15,7 +15,7 @@ public:
 						VERSIONS, RENDERER, RES_LOOKUP, 
 						GLOBAL_INIT, RENDER_STATIC_DASH, RENDER_DYNAMIC_DASH,
 						MENU_INIT, INITIALIZE_SKYBOX, RENDER_SKYBOX, CALL_INIT_SKYBOX,
-						MENU_STRUCT_PROCESSOR, MENU_CAR_LOT, MENU_MAIN_LOADOUT, MENU_CAR_FACTORY  
+						MENU_STRUCT_PROCESSOR, MENU_CAR_LOT, MENU_MAIN_LOADOUT, MENU_CAR_FACTORY						
 						};
 
 	enum DWORDType { RENDERER_TYPE, MY_SLEEP, SKYBOX_HEIGHT, RES_TYPE, SHOW_DEBUG, 
@@ -43,6 +43,7 @@ private:
 	static void CreateSkyboxArgumentFunction(GameData::Version version);
 	static void CreateInitSkyboxFunction(GameData::Version version);
 	static void CreateMenusFunction(GameData::Version version);
+	static void CreateNoDashFunction(GameData::Version version);
 };
 
 
