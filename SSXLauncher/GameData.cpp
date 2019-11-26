@@ -22,6 +22,7 @@ bool GameData::PatchGame(std::string game_exe, GameData::Version version)
 	CreateMenuInitFunction(version);
 	CreateInitSkyboxFunction(version);
 	CreateSkyboxArgumentFunction(version);
+	CreateMenusFunction(version);
 	return Patcher::Patch(master->instructions, game_exe);
 }
 
@@ -298,6 +299,26 @@ void GameData::CreateGlobalInitFunction(GameData::Version version)
 	instructions << ByteArray{ 0x89, 0x8E, 0x96, 0x4B, 0x00, 0x00 }; //mov [esi+4B96], ecx  //physical screen height
 	instructions << ByteArray{ 0x89, 0xBE, 0x9A, 0x4B, 0x00, 0x00 }; //mov [esi+4B9A], edi  //color depth
 
+	//Menu Fixes
+	//Set render width into car factory and main car loadout, however use 640 for the car lot view
+	instructions << BYTE(0xA3);
+	instructions << GameData::GetDWORDAddress(version, GameData::MENU_PTR_CAR_FACTORY_WIDTH);
+
+	instructions << BYTE(0xA3);
+	instructions << GameData::GetDWORDAddress(version, GameData::MENU_PTR_MAIN_LOADOUT_WIDTH);
+
+	instructions << ByteArray{ 0xC7, 0x05 };
+	instructions << GameData::GetDWORDAddress(version, GameData::MENU_PTR_UNKNOWN) + 0x14; //view width
+	instructions << DWORD(0x280); 
+
+	instructions << ByteArray{ 0xC7, 0x05 };
+	instructions << GameData::GetDWORDAddress(version, GameData::MENU_PTR_UNKNOWN) + 0x8; //size width
+	instructions << DWORD(0x280);
+
+	instructions << ByteArray{ 0xC7, 0x05 };
+	instructions << GameData::GetDWORDAddress(version, GameData::MENU_PTR_UNKNOWN) + 0xC; //size height
+	instructions << DWORD(0x1E0);	
+
 	instructions << ByteArray{ 0xC7, 0x86, 0x6A, 0x4B, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00 }; //mov [esi + 4B6A], 1
 	instructions << ByteArray{ 0xC7, 0x86, 0xB6, 0x4B, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00 }; //mov [esi + 4BB6], 1
 	instructions << ByteArray{ 0xC7, 0x86, 0xF6, 0x4B, 0x00, 0x00, 0x00, 0x00, 0x20, 0x41 }; //mov [esi + 4BF6], 41200000
@@ -357,6 +378,26 @@ void GameData::CreateInitSkyboxFunction(GameData::Version version)
 	size_t is_size = instructions.GetInstructions().size();
 	master->SetLastDetourSize(is_size);
 	printf("[Skybox Initialization] Generated a total of %d bytes\n", is_size);
+	master->instructions.push_back(instructions);
+}
+
+void GameData::CreateMenusFunction(GameData::Version version)
+{
+	/*
+	The "Car Lot" view requires a render width of 640 (for some reason). The menu struct pointer
+	which is passed into the menu processor (0x4A9BA5) is the same for the car lot and main car
+	menu. This change uses a different menu struct pointer, however I believe we can make an entirely
+	new menu struct if needed (the one I'm using is not really used however).
+	*/
+
+
+	//MENU_PTR_UNKNOWN_WIDTH populated in global init
+	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::MENU_CAR_LOT);
+	Instructions instructions(DWORD(function_entry + 0x587)); 
+	instructions << BYTE(0x68);
+	instructions << GameData::GetDWORDAddress(version, GameData::MENU_PTR_UNKNOWN);
+
+	printf("[Menus Patch] Generated a total of %d bytes\n", instructions.GetInstructions().size());
 	master->instructions.push_back(instructions);
 }
 
@@ -458,11 +499,20 @@ void GameData::initialize(PEINFO info)
 	version_classics.functions[INITIALIZE_SKYBOX] = 0x54C780;
 	version_classics.functions[RENDER_SKYBOX] = 0x54CB70;
 	version_classics.functions[CALL_INIT_SKYBOX] = 0x4A1B70;
-
 	
 	version_classics.global_dwords[RENDERER_TYPE] = 0x6906BC; //0 = Software, 1 = Glide, 2 = OpenGL	
 	version_classics.global_dwords[SHOW_DEBUG] = 0x5E7954; //1 = on, 0 = off, loc_4541C8
-	
+
+	version_classics.functions[MENU_CAR_LOT] = 0x425C40;
+	version_classics.functions[MENU_CAR_FACTORY] = 0x478CC0;
+	version_classics.functions[MENU_MAIN_LOADOUT] = 0x413500;
+
+	version_classics.global_dwords[MENU_PTR_CAR_FACTORY] = 0x5E87C0;
+	version_classics.global_dwords[MENU_PTR_CAR_FACTORY_WIDTH] = 0x5E87D4; //base + 0x14
+	version_classics.global_dwords[MENU_PTR_MAIN_LOADOUT] = 0x5E6A88;
+	version_classics.global_dwords[MENU_PTR_MAIN_LOADOUT_WIDTH] = 0x5E6A9C; //base + 0x14
+	version_classics.global_dwords[MENU_PTR_UNKNOWN] = 0x697830;
+	version_classics.global_dwords[MENU_PTR_UNKNOWN_WIDTH] = 0x697844; //base +0x14	
 
 	version_classics.global_dwords[LIGHT_1_PTR] = 0x5E7970;
 	version_classics.global_dwords[LIGHT_2_PTR] = 0x5E7974;
@@ -472,6 +522,7 @@ void GameData::initialize(PEINFO info)
 
 	//---------- IN PROGRESS
 	version_classics.functions[VERSIONS] = 0x470F90;	
+	version_classics.functions[MENU_STRUCT_PROCESSOR] = 0x4A9BA5;
 
 	//---------- Below here contains completely new functions/variables
 	version_classics.global_dwords[MY_SLEEP] = master->base_location + 0x4;
