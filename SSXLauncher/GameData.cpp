@@ -299,14 +299,21 @@ void GameData::CreateGlobalInitFunction(GameData::Version version)
 	instructions << ByteArray{ 0x89, 0x86, 0x92, 0x4B, 0x00, 0x00 }; //mov [esi+4B92], eax 	//physical screen width
 	instructions << ByteArray{ 0x89, 0x8E, 0x96, 0x4B, 0x00, 0x00 }; //mov [esi+4B96], ecx  //physical screen height
 	instructions << ByteArray{ 0x89, 0xBE, 0x9A, 0x4B, 0x00, 0x00 }; //mov [esi+4B9A], edi  //color depth
+	
+	/*
+	Menu Fixes
+	Set render width into car factory and main car loadout, however use 640 for the car lot view
+	Menu + 0x14 = view width
+	Menu + 0x18 = view height
+	Menu + 0x8  = size width
+	Menu + 0xC  = size height
+	*/
 
-	//Menu Fixes
-	//Set render width into car factory and main car loadout, however use 640 for the car lot view
 	instructions << BYTE(0xA3);
-	instructions << GameData::GetDWORDAddress(version, GameData::MENU_PTR_CAR_FACTORY_WIDTH);
+	instructions << GameData::GetDWORDAddress(version, GameData::MENU_PTR_CAR_FACTORY) + 0x14; 
 
 	instructions << BYTE(0xA3);
-	instructions << GameData::GetDWORDAddress(version, GameData::MENU_PTR_MAIN_LOADOUT_WIDTH);
+	instructions << GameData::GetDWORDAddress(version, GameData::MENU_PTR_MAIN_LOADOUT) + 0x14;
 
 	instructions << ByteArray{ 0xC7, 0x05 };
 	instructions << GameData::GetDWORDAddress(version, GameData::MENU_PTR_UNKNOWN) + 0x14; //view width
@@ -341,6 +348,11 @@ void GameData::CreateGlobalInitFunction(GameData::Version version)
 
 	instructions << ByteArray{ 0x8D, 0xBE, 0x86, 0x4B, 0x00, 0x00 }; //lea edi, [esi+4B86]
 	instructions << ByteArray{ 0x8D, 0x9E, 0x92, 0x4B, 0x00, 0x00 }; //lea ebx, [esi+4B92]	
+
+	//Only used for initial refresh on high-res modes
+	instructions << ByteArray{ 0xB8, 0x04, 0x00, 0x00, 0x00 }; // mov eax, 0x4
+	instructions << BYTE(0xA3);
+	instructions << GameData::GetDWORDAddress(version, GameData::SHOULD_RENDER_DASH); //mov var, eax
 
 	instructions.jmp(function_entry + 0xF9); //jmp back
 
@@ -481,13 +493,25 @@ void GameData::CreateNoDashFunction(GameData::Version version)
 	instructions << ByteArray{ 0xB8, 0x01, 0x00, 0x00, 0x00 }; //mov eax, 1
 	instructions << ByteArray{ 0x89, 0x81, 0x32, 0x05, 0x04, 0x00 }; //mov [ecx+0x40532], eax
 	instructions << BYTE(0xC3); //ret
-	instructions << ByteArray{ 0x8B, 0x81, 0x32, 0x05, 0x04, 0x00 }; //mov eax, [ecx+0x40532]
-	instructions << BYTE(0xC3);
-
+	instructions << ByteArray{ 0x33, 0xC0 }; //xor eax, eax
+	instructions << ByteArray{ 0x83, 0x3D };
+	instructions << GameData::GetDWORDAddress(version, GameData::SHOULD_RENDER_DASH);
+	instructions << BYTE(0x00); //cmp should_render, 0
+	instructions << ByteArray{ 0x74, 0x01 }; //jmp 0x1
+	instructions << BYTE(0x40); //inc eax
+	instructions << ByteArray{ 0x89, 0x81, 0x32, 0x05, 0x04, 0x00 }; //mov [ecx+0x40532], eax
+	instructions << BYTE(0xC3); //ret
+								
 	master->SetLastDetourSize(instructions.GetInstructions().size());
 
-	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::RENDER_STATIC_DASH);
-	instructions.relocate(DWORD(function_entry + 0x589));
+	DWORD rsd_entry = GameData::GetFunctionAddress(version, GameData::RENDER_STATIC_DASH);
+	instructions.relocate(DWORD(rsd_entry + 0x589));
+	instructions.call(check_cockpit_func);	
+
+	DWORD rd_entry = GameData::GetFunctionAddress(version, GameData::RENDER_DASH);
+	instructions.relocate(DWORD(rd_entry + 0x4B));
+	instructions << ByteArray{ 0x8B, 0x0D };
+	instructions << GameData::GetDWORDAddress(version, GameData::MAIN_DASH_PTR);
 	instructions.call(check_cockpit_func);
 
 	master->instructions.push_back(instructions);
@@ -525,6 +549,8 @@ void GameData::initialize(PEINFO info)
 	version_classics.functions[RENDER_DYNAMIC_DASH] = 0x450F40;
 	version_classics.functions[MENU_INIT] = 0x42E860;
 	version_classics.functions[RES_LOOKUP] = 0x49C4C0;
+	version_classics.functions[UNKNOWN_INIT_FUNCTION] = 0x456990;
+	version_classics.functions[RENDER_DASH] = 0x4542A0;
 
 	version_classics.functions[INITIALIZE_SKYBOX] = 0x54C780;
 	version_classics.functions[RENDER_SKYBOX] = 0x54CB70;
@@ -538,17 +564,19 @@ void GameData::initialize(PEINFO info)
 	version_classics.functions[MENU_MAIN_LOADOUT] = 0x413500;
 
 	version_classics.global_dwords[MENU_PTR_CAR_FACTORY] = 0x5E87C0;
-	version_classics.global_dwords[MENU_PTR_CAR_FACTORY_WIDTH] = 0x5E87D4; //base + 0x14
+	//version_classics.global_dwords[MENU_PTR_CAR_FACTORY_WIDTH] = 0x5E87D4; //base + 0x14
 	version_classics.global_dwords[MENU_PTR_MAIN_LOADOUT] = 0x5E6A88;
-	version_classics.global_dwords[MENU_PTR_MAIN_LOADOUT_WIDTH] = 0x5E6A9C; //base + 0x14
+	//version_classics.global_dwords[MENU_PTR_MAIN_LOADOUT_WIDTH] = 0x5E6A9C; //base + 0x14
 	version_classics.global_dwords[MENU_PTR_UNKNOWN] = 0x697830;
-	version_classics.global_dwords[MENU_PTR_UNKNOWN_WIDTH] = 0x697844; //base +0x14	
+	//version_classics.global_dwords[MENU_PTR_UNKNOWN_WIDTH] = 0x697844; //base +0x14	
 
 	version_classics.global_dwords[LIGHT_1_PTR] = 0x5E7970;
 	version_classics.global_dwords[LIGHT_2_PTR] = 0x5E7974;
 	version_classics.global_dwords[RENDER_AREA_WIDTH] = 0x5E7880;
 	version_classics.global_dwords[RENDER_AREA_HEIGHT] = 0x5E7884;
 	version_classics.global_dwords[RES_TYPE] = 0x5E7898; //Default = 1, 640x480
+	version_classics.global_dwords[MAIN_DASH_PTR] = 0x5E79C8;
+	version_classics.global_dwords[SHOULD_RENDER_DASH] = 0x5E7900;
 
 	//---------- IN PROGRESS
 	version_classics.functions[VERSIONS] = 0x470F90;	

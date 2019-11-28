@@ -109,6 +109,11 @@ The image data pointer is later accessed at addresses 0x450EF6 and 0x51AFA9 - bo
 ecx+0x13 is compared against esi (the number of images to load for the dash set). 
 For instance sedf loads 3 images (sedf0, sedf1, sedf2). 
 
+Dynamic Dash (Cockpit + 3rd person) UI Struct pointer is 0x5E79C8. This gets processed by 0x450F40 which checks to
+see if we are in 3rd person or cockpit view [5E79C8 + 0x40532]. If we are in 3rd person, just continue in the function
+which sets the offsets - otherwise call the Cockpit dash render function (0x4525A0). The cockpit dash render function
+later sets the dynamic elements in control block 0x452C14 - this is because different dashboards have different layouts.
+
 
 ----- Menu UI In Progress -----
 The menus need to still be rendered in 640x480. There appears to be a static struct pointer that gets passed around to various functions containing
