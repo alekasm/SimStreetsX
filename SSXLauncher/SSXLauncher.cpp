@@ -21,6 +21,7 @@ namespace
 	HWND HelpButton;
 	HWND settingsHwnd;
 	HWND verifyCheckbox;
+	HWND fpsCheckbox;
 	HWND fsRadioButton;
 	HWND wsRadioButton;
 
@@ -46,8 +47,9 @@ namespace
 SSXParameters GetParameters()
 {
 	SSXParameters parameters;
-	parameters.verify_install = SendMessage(verifyCheckbox, BM_GETCHECK, 0, 0) == BST_CHECKED;
+	parameters.verify_install = SendMessage(verifyCheckbox, BM_GETCHECK, 0, 0) == BST_CHECKED;	
 	parameters.fullscreen = SendMessage(fsRadioButton, BM_GETCHECK, 0, 0) == BST_CHECKED;
+	parameters.show_fps = SendMessage(fpsCheckbox, BM_GETCHECK, 0, 0) == BST_CHECKED;
 
 	switch (resolutionValue)
 	{
@@ -129,6 +131,7 @@ void initialize(HINSTANCE hInstance)
 		NULL, NULL);
 	Button_SetCheck(verifyCheckbox, BST_CHECKED);
 
+
 	PatchButton = CreateWindow(
 		"Button", "Patch Game", WS_VISIBLE | WS_CHILDWINDOW | BS_PUSHBUTTON,
 		10, 65, 150, 25, settingsHwnd, NULL,
@@ -156,6 +159,12 @@ void initialize(HINSTANCE hInstance)
 		"Button", "Windowed", WS_VISIBLE | WS_CHILDWINDOW | BS_AUTORADIOBUTTON,
 		115, 170, 100, 25, settingsHwnd, NULL,
 		NULL, NULL);
+
+	fpsCheckbox = CreateWindow(
+		"Button", "Show FPS", WS_VISIBLE | WS_CHILDWINDOW | BS_AUTOCHECKBOX,
+		225, 90, 100, 25, settingsHwnd, NULL,
+		NULL, NULL);
+	Button_SetCheck(fpsCheckbox, BST_UNCHECKED);
 
 	StartButton = CreateWindow(
 		"Button", "Drive!", WS_VISIBLE | WS_CHILDWINDOW | BS_PUSHBUTTON,

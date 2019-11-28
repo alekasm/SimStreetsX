@@ -216,8 +216,10 @@ bool SSXLoader::CreatePatchedGame(std::string game_location, SSXParameters param
 	std::vector<Instructions> instructions = GameData::GenerateData(info, game_version);
 	DWORD sleep_address = info.GetDetourVirtualAddress(DetourOffsetType::MY_SLEEP);
 	DWORD res_address = Versions[game_version]->data.RES_TYPE;
+	DWORD debug_address = Versions[game_version]->data.SHOW_DEBUG;
 	instructions.push_back(DataValue(sleep_address, BYTE(params.sleep_time)));
-	instructions.push_back(DataValue(res_address, BYTE(params.resolution_mode)));
+	instructions.push_back(DataValue(res_address, BYTE(params.resolution_mode)));	
+	instructions.push_back(DataValue(debug_address, params.show_fps));
 
 	if (!Patcher::Patch(info, instructions, SCXDirectory("SimStreetsX.exe")))
 	{
@@ -381,8 +383,10 @@ bool SSXLoader::StartSSX(SSXParameters params)
 	std::vector<Instructions> instructions;
 	DWORD sleep_address = info.GetDetourVirtualAddress(DetourOffsetType::MY_SLEEP);
 	DWORD res_address = Versions[game_version]->data.RES_TYPE;
+	DWORD debug_address = Versions[game_version]->data.SHOW_DEBUG;
 	instructions.push_back(DataValue(sleep_address, BYTE(params.sleep_time)));
 	instructions.push_back(DataValue(res_address, BYTE(params.resolution_mode)));
+	instructions.push_back(DataValue(debug_address, params.show_fps));
 
 	if (!Patcher::Patch(info, instructions, SimStreetsGameLocation.c_str()))
 	{

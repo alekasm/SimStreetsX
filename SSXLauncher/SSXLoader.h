@@ -24,6 +24,7 @@ struct SSXParameters
 	unsigned int sleep_time;
 	unsigned int resolution_mode;
 	bool fullscreen;
+	bool show_fps;
 };
 
 class SSXLoader
