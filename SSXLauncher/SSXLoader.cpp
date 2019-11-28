@@ -14,14 +14,14 @@ namespace
 	const std::string patch_file("SSXPatch.dat");
 	const std::string game_file("Streets.exe");
 	
-	std::map<std::string, GameData::Version> version_hashes = 
+	std::map<std::string, GameVersions> version_hashes =
 	{
-		{"df473d94fb4d6741628d58c251224c02", GameData::Version::VERSION_1_0},
+		{"df473d94fb4d6741628d58c251224c02", GameVersions::VCLASSICS},
 	};
 
-	std::map<GameData::Version, std::string> version_description = 
+	std::map<GameVersions, std::string> version_description = 
 	{
-		{GameData::Version::VERSION_1_0, "Version 1.0 - October 21, 1997"},
+		{GameVersions::VCLASSICS, "Version 1.0 - October 21, 1997"},
 	};
 
 	std::string SimStreetsXDirectory;
@@ -33,7 +33,7 @@ namespace
 	int patched_ssxversion = -1;
 
 	PEINFO peinfo;
-	GameData::Version game_version;
+	GameVersions game_version;
 	FileVersion fileVersion;
 }
 
@@ -131,16 +131,7 @@ bool CreatePatchFile()
 	return false;
 }
 
-bool SSXLoader::InitializeGameData(std::string game_location)
-{
-	if (!Patcher::CreateDetourSection(game_location.c_str(), &peinfo))
-		return false;
-
-	GameData::initialize(peinfo);
-	return true;
-}
-
-bool SSXLoader::CreatePatchedGame(std::string game_location, bool verify_installation)
+bool SSXLoader::CreatePatchedGame(std::string game_location, SSXParameters params)
 {
 	OutputDebugString(std::string("Attempting to patch game at " + game_location + "\n").c_str());
 
@@ -158,6 +149,15 @@ bool SSXLoader::CreatePatchedGame(std::string game_location, bool verify_install
 
 	if (!(verifyCurrentValue = VerifyOriginalGame(GameLocation)).Value)
 	{
+		if (!params.verify_install)
+		{
+			std::string message_body = "The Streets of SimCity game you selected isn't supported or is already modified/patched. Not ";
+			message_body += "attempting to use a backup copy since 'Verify Install' was not selected.\n\n";
+			message_body += verifyCurrentValue.Message;
+			ShowMessage("SimStreetsX Error", message_body);
+			return false;
+		}
+
 		if (!VerifyOriginalGame(SCXDirectory("Streets.exe")).Value)
 		{
 			std::string message_body = "The Streets of SimCity game you selected isn't supported or is already modified/patched. SimStreetsX ";
@@ -166,7 +166,8 @@ bool SSXLoader::CreatePatchedGame(std::string game_location, bool verify_install
 			message_body += verifyCurrentValue.Message;
 			ShowMessage("SimStreetsX Error", message_body);
 			return false;
-		}	
+		}
+
 		using_backup_copy = true;
 	}
 	else
@@ -178,8 +179,8 @@ bool SSXLoader::CreatePatchedGame(std::string game_location, bool verify_install
 			return false;
 		}
 	}
-	
-	if (verify_installation)
+
+	if (params.verify_install)
 	{
 		MessageValue msg_verify;
 		if (!(msg_verify = VerifyInstallationDirectory(GameLocation)).Value)
@@ -205,19 +206,26 @@ bool SSXLoader::CreatePatchedGame(std::string game_location, bool verify_install
 		return false;
 	}
 
-	if (!InitializeGameData(SCXDirectory("SimStreetsX.exe")))
+	PEINFO info;
+	if (!Patcher::CreateDetourSection(SCXDirectory("SimStreetsX.exe").c_str(), &info))
 	{
 		ShowMessage("SimStreetsX Patch Failed", "Failed to modify the game's executable file.\n Make sure the game isn't running or opened in another application");
 		return false;
 	}
 
-	if (!GameData::PatchGame(SCXDirectory("SimStreetsX.exe"), game_version))
+	std::vector<Instructions> instructions = GameData::GenerateData(info, game_version);
+	DWORD sleep_address = info.GetDetourVirtualAddress(DetourOffsetType::MY_SLEEP);
+	DWORD res_address = Versions[game_version]->data.RES_TYPE;
+	instructions.push_back(DataValue(sleep_address, BYTE(params.sleep_time)));
+	instructions.push_back(DataValue(res_address, BYTE(params.resolution_mode)));
+
+	if (!Patcher::Patch(info, instructions, SCXDirectory("SimStreetsX.exe")))
 	{
 		ShowMessage("SimStreetsX Patch Failed", "Failed to patch the game file.\n Make sure the game isn't running or opened in another application");
 		return false;
 	}
 
-	SimStreetsGameLocation = verify_installation ? SimStreetsGameInstallDirectory + "Streets.exe" : GameLocation;
+	SimStreetsGameLocation = params.verify_install ? SimStreetsGameInstallDirectory + "Streets.exe" : GameLocation;
 
 	BOOL copy_result3 = CopyFileA(SCXDirectory("SimStreetsX.exe").c_str(), SimStreetsGameLocation.c_str(), FALSE);
 	if (!copy_result3)
@@ -226,7 +234,7 @@ bool SSXLoader::CreatePatchedGame(std::string game_location, bool verify_install
 		return false;
 	}
 
-	patched_ssxversion = SSX_VERSION;	
+	patched_ssxversion = SSX_VERSION;
 
 	BOOL delete_result = DeleteFileA(SCXDirectory("SimStreetsX.exe").c_str());
 	if (!delete_result)
@@ -234,8 +242,7 @@ bool SSXLoader::CreatePatchedGame(std::string game_location, bool verify_install
 		OutputDebugString(std::string("Failed to delete intermediary SimStreetsX game file. Still successful... Error: (" + std::to_string(GetLastError()) + ")").c_str());
 	}
 
-	bool create_pfile = CreatePatchFile();
-	if (!create_pfile)
+	if (params.verify_install && !CreatePatchFile())
 	{
 		ShowMessage("SimStreetsX Error", "Failed to create the patch file which stores information about your specific patch.");
 		return false;
@@ -248,14 +255,16 @@ bool SSXLoader::CreatePatchedGame(std::string game_location, bool verify_install
 		message += "Detected Version: " + version_description[game_version] + "\n";
 
 	message += "Patch location : \n" + game_location + "\n\n";
-	if (verify_installation)
+	if (params.verify_install)
 		message += "If you modify or move this file, you will need to re-patch again.\n";
 	else
-		message += "You patched this game without 'Verify Install', so you can't launch using SSXLauncher\n";
+		message += "You patched this game without 'Verify Install', so you can't launch using SCXLauncher\n";
+
 
 	ShowMessage("SimStreetsX Patch Successful!", message);
 	return true;
 }
+
 
 void ClearPatchFile(std::string reason)
 {
@@ -329,7 +338,7 @@ bool VerifyPatchedGame()
 	return true;
 }
 
-bool SSXLoader::StartSSX(int sleep_time, int resolution_mode, bool fullscreen)
+bool SSXLoader::StartSSX(SSXParameters params)
 {
 
 	if (patched_ssxversion < 0) //This shouldn't happen because the button should not be enabled
@@ -337,7 +346,7 @@ bool SSXLoader::StartSSX(int sleep_time, int resolution_mode, bool fullscreen)
 		ShowMessage("SimStreetsX Error", "You need to patch the game before starting.");
 		return false;
 	}
-	
+
 	if (!ValidInstallation) //This shouldn't happen because the button should not be enabled
 	{
 		ShowMessage("SimStreetsX Error", "You need to patch the game using 'Verify Install'");
@@ -349,17 +358,10 @@ bool SSXLoader::StartSSX(int sleep_time, int resolution_mode, bool fullscreen)
 		return false;
 	}
 
-	if (!InitializeGameData(SimStreetsGameLocation))
+	if (!params.fullscreen && !GetFileCompatability(SimStreetsGameLocation))
 	{
-		ShowMessage("SimStreetsX Error", "Failed to start the game.\n Make sure the game isn't running or opened in another application");
-		return false;
-	}
-	
-	if (!fullscreen && !GetFileCompatability(SimStreetsGameLocation))
-	{
-		const char *message =
-			"You must run the Streets.exe in 8-bit color to use Windowed mode!\n"
-			"Use the 'top-level' Streets.exe, NOT the exe/Streets.exe\n\n"
+		const char* message =
+			"You must run the Streets.exe in 8-bit color to use Windowed mode!\n\n"
 			"1. Right Click Streets.exe -> Properties\n"
 			"2. Select the 'Compatibility' tab\n"
 			"3. Enable 'Reduced color mode' and select 8-bit/256 color\n"
@@ -369,14 +371,31 @@ bool SSXLoader::StartSSX(int sleep_time, int resolution_mode, bool fullscreen)
 		return false;
 	}
 
-	DWORD sleep_offset = GameData::GetDWORDAddress(game_version, GameData::DWORDType::MY_SLEEP);
-	BYTE sleep_value(sleep_time);
-	Patcher::Patch(DataValue(sleep_offset, sleep_value), SimStreetsGameLocation);
+	PEINFO info;
+	if (!Patcher::CreateDetourSection(SimStreetsGameLocation.c_str(), &info)) //Should grab detour section
+	{
+		ShowMessage("SimStreetsX Patch Failed", "Failed to modify the game's executable file.\n Make sure the game isn't running or opened in another application");
+		return false;
+	}
+
+	std::vector<Instructions> instructions;
+	DWORD sleep_address = info.GetDetourVirtualAddress(DetourOffsetType::MY_SLEEP);
+	DWORD res_address = Versions[game_version]->data.RES_TYPE;
+	instructions.push_back(DataValue(sleep_address, BYTE(params.sleep_time)));
+	instructions.push_back(DataValue(res_address, BYTE(params.resolution_mode)));
+
+	if (!Patcher::Patch(info, instructions, SimStreetsGameLocation.c_str()))
+	{
+		ShowMessage("SimStreetsX Patch Failed", "Failed to patch the game file.\n Make sure the game isn't running or opened in another application");
+		return false;
+	}
+
+	//Can only get the hash at this point as a reference, can't use it to check for complete validty
+	//because changing sleep time and resolution mode dwords will change the hash
 
 	CreatePatchFile();
 
-	std::string parameters = fullscreen ? "-f" : "-w";
-	//parameters += " -o0"; //TODO figure out which global dwords this changes
+	std::string parameters = params.fullscreen ? "-f" : "-w";
 	HINSTANCE hInstance = ShellExecuteA(NULL, "open", SimStreetsGameLocation.c_str(), parameters.c_str(), NULL, SW_SHOWDEFAULT);
 	int h_result = reinterpret_cast<int>(hInstance);
 	if (h_result <= 31)
@@ -425,7 +444,7 @@ bool SSXLoader::LoadFiles()
 				patched_hash = props.at(0);
 				patched_ssxversion = std::atoi(props.at(1).c_str());
 				SimStreetsGameLocation = props.at(2);				
-				game_version = static_cast<GameData::Version>(std::atoi(props.at(3).c_str()));
+				game_version = static_cast<GameVersions>(std::atoi(props.at(3).c_str()));
 				ValidInstallation = std::atoi(props.at(4).c_str());
 				OutputDebugString(std::string("Game is patched at: " + SimStreetsGameLocation + "\n").c_str());
 				OutputDebugString(std::string("Game version enum: " + std::to_string(static_cast<int>(game_version)) + "\n").c_str());

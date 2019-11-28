@@ -13,7 +13,7 @@ void initialize(HINSTANCE hInstance);
 namespace
 {
 
-	LPCSTR ResolutionOptions[4] = { "[4:3] 640x480 (Original)", "[4:3] 1024x768", "[16:9] 1280x720", "[16:10] 1280x800" };
+	LPCSTR ResolutionOptions[4] = { "[4:3] 640x480 (Original)", "[4:3] 800x600", "[16:9] 1024x576", "[16:10] 1280x800" };
 	unsigned int SpeedValues[7] = { 1, 4, 8, 16, 24, 32, 64 };
 
 	HWND PatchButton; 
@@ -31,7 +31,7 @@ namespace
 
 	HWND SensitivityBar;
 	HWND resolutionTextbox;
-	HWND AimbotErrorText;
+
 
 	WNDCLASSEX SettingsClass;
 
@@ -41,6 +41,35 @@ namespace
 
 	int speedMS = 24;
 	HBITMAP hBitmap = NULL;
+}
+
+SSXParameters GetParameters()
+{
+	SSXParameters parameters;
+	parameters.verify_install = SendMessage(verifyCheckbox, BM_GETCHECK, 0, 0) == BST_CHECKED;
+	parameters.fullscreen = SendMessage(fsRadioButton, BM_GETCHECK, 0, 0) == BST_CHECKED;
+
+	switch (resolutionValue)
+	{
+	case 0: //640x480
+		parameters.resolution_mode = 1;
+		break;
+	case 1: //800x600
+		parameters.resolution_mode = 2;
+		break;
+	case 2: //1024x576
+		parameters.resolution_mode = 0;
+		break;
+	case 3: //1280x800
+		parameters.resolution_mode = 3;
+		break;
+	default:
+		printf("Error: Invalid resolution combobox selection \n");
+		parameters.resolution_mode = 1;
+		break;
+	}
+	parameters.sleep_time = speedMS;
+	return parameters;
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -162,11 +191,9 @@ void initialize(HINSTANCE hInstance)
 	UpdateWindow(resolutionCombobox);
 
 	Button_Enable(StartButton, FALSE);
-	ComboBox_Enable(resolutionCombobox, FALSE);
 
 	UpdateWindow(fsRadioButton);
 	UpdateWindow(wsRadioButton);
-
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
@@ -205,12 +232,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 		return 0;
 
 	case WM_HSCROLL:
+		if (true)
 		{
 			int sliderValue = SendMessage((HWND)lParam, (UINT)TBM_GETPOS, (WPARAM)0, (LPARAM)0);
 			speedMS = 16;
 
-			if (sliderValue && sliderValue <= (sizeof(SpeedValues) / 4))			
-				speedMS = SpeedValues[sliderValue - 1];		
+			if (sliderValue && sliderValue <= (sizeof(SpeedValues) / 4))
+				speedMS = SpeedValues[sliderValue - 1];
 
 			std::string speedText("Game Sleep: ");
 			speedText.append(std::to_string(speedMS)).append("ms");
@@ -219,6 +247,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 		}
 		return 0;
 	case WM_COMMAND:
+
 		if ((HWND)lParam == resolutionCombobox)
 		{
 			if (HIWORD(wParam) == CBN_SELCHANGE)
@@ -268,48 +297,23 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 					ofn.lpstrInitialDir = NULL;
 					ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 					GetOpenFileName(&ofn);
-
-					bool verify_install = SendMessage(verifyCheckbox, BM_GETCHECK, 0, 0) == BST_CHECKED;
-					bool result = SSXLoader::CreatePatchedGame(ofn.lpstrFile, verify_install);
-					Button_Enable(StartButton, verify_install ? SSXLoader::GetValidInstallation() : result);
+					SSXParameters params = GetParameters();
+					bool result = SSXLoader::CreatePatchedGame(ofn.lpstrFile, params);
+					Button_Enable(StartButton, params.verify_install ? SSXLoader::GetValidInstallation() : false);
 					Button_Enable(PatchButton, TRUE);
 				}
 				else if ((HWND)lParam == StartButton)
-				{			
-					int dword_5017D0;
-					switch (resolutionValue)
-					{
-					case 0: //640x480
-						dword_5017D0 = 1;
-						break;
-					case 1: //1024x768
-						dword_5017D0 = 3;
-						break;
-					case 2: //1280x720
-						dword_5017D0 = 2;
-						break;
-					case 3: //1280x800
-						dword_5017D0 = 0;
-						break;
-					default:	
-						printf("Error: Invalid resolution combobox selection \n");
-						return 0;
-					}
-
-					int dword_5017A8 = speedMS;
-					bool fullscreen = SendMessage(fsRadioButton, BM_GETCHECK, 0, 0) == BST_CHECKED;			
-					
-					//TODO Currently only Resolution 640x480 is supported
-					if (SSXLoader::StartSSX(dword_5017A8, 1, fullscreen))
+				{
+					if (SSXLoader::StartSSX(GetParameters()))
 					{
 						end_process = true;
 					}
 					::SetFocus(NULL);
-					UpdateWindow(StartButton);					
+					UpdateWindow(StartButton);
 				}
 				else if ((HWND)lParam == HelpButton)
-				{				
-					ShellExecute(0, 0, "http://www.streetsofsimcity.com/help.html", 0, 0, SW_SHOW);
+				{
+					ShellExecute(0, 0, "http://streetsofsimcity.com/help.html", 0, 0, SW_SHOW);
 					::SetFocus(NULL);
 					UpdateWindow(HelpButton);
 				}

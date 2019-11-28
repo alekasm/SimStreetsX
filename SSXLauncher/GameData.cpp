@@ -1,41 +1,30 @@
 #include "GameData.h"
 
-namespace
+
+std::vector<Instructions> GameData::GenerateData(PEINFO info, GameVersions version)
 {
-	struct Game
-	{
-		std::map<GameData::FunctionType, DWORD> functions;
-		std::map<GameData::DWORDType, DWORD> global_dwords;
-	};
-	std::map<GameData::Version, Game> games;
-	DetourMaster* master;
+	DetourMaster* master = new DetourMaster(info);
+	CreateSleepFunction(master, version);
+	CreateCDFunction(master, version);
+	CreateRendererFunction(master, version);
+	CreateRenderStaticDashFunction(master, version);
+	CreateGlobalInitFunction(master, version);
+	CreateRenderDynamicDashFunction(master, version);
+	CreateMenuInitFunction(master, version);
+	CreateInitSkyboxFunction(master, version);
+	CreateSkyboxArgumentFunction(master, version);
+	CreateMenusFunction(master, version);
+	CreateNoDashFunction(master, version);
+	CreateResolutionFunction(master, version);
+	CreateTimedFunction(master, version);
+	std::vector<Instructions> ret_ins(master->instructions);
+	delete master;
+	return ret_ins;
 }
 
-bool GameData::PatchGame(std::string game_exe, GameData::Version version)
+void GameData::CreateCDFunction(DetourMaster* master, GameVersions version)
 {
-	CreateSleepFunction(version);
-	CreateCDFunction(version);
-	CreateRendererFunction(version);
-	CreateRenderStaticDashFunction(version);
-	CreateGlobalInitFunction(version);
-	CreateRenderDynamicDashFunction(version);
-	CreateMenuInitFunction(version);
-	CreateInitSkyboxFunction(version);
-	CreateSkyboxArgumentFunction(version);
-	CreateMenusFunction(version);
-	CreateNoDashFunction(version);
-	CreateResolutionFunction(version);
-	return Patcher::Patch(master->instructions, game_exe);
-}
-
-DWORD GameData::GetDWORDOffset(GameData::Version version, GameData::DWORDType dword_type)
-{
-	return master->GetFileOffset(games[version].global_dwords[dword_type]);
-}
-
-void GameData::CreateCDFunction(GameData::Version version)
-{
-	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::CD_CHECK);
+	DWORD function_entry = Versions[version]->functions.CD_CHECK;
 	Instructions instructions(DWORD(function_entry + 0x19B));
 	instructions.jmp(DWORD(function_entry + 0x2B3));    //jmp <location> (originally jnz)
 
@@ -44,9 +33,10 @@ void GameData::CreateCDFunction(GameData::Version version)
 	master->instructions.push_back(instructions);
 }
 
-void GameData::CreateRendererFunction(GameData::Version version)
+void GameData::CreateRendererFunction(DetourMaster* master, GameVersions version)
 {
-	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::RENDERER);
+
+	DWORD function_entry = Versions[version]->functions.RENDERER;
 
 	/*
 	Function 4707C0 is a programming error from the original developers:
@@ -73,15 +63,15 @@ void GameData::CreateRendererFunction(GameData::Version version)
 	printf("[Software Renderer Patch] Generated a total of %d bytes\n", is_size);
 	master->instructions.push_back(instructions);
 
-	DWORD r_address = GameData::GetDWORDAddress(version, GameData::RENDERER_TYPE);
+	DWORD r_address = Versions[version]->data.RENDERER_TYPE;
 	master->instructions.push_back(DataValue(r_address, 0x00));
 }
 
-void GameData::CreateSleepFunction(GameData::Version version)
+void GameData::CreateSleepFunction(DetourMaster* master, GameVersions version)
 {
-	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::MAIN_LOOP);
-	DWORD dsfunction_sleep = GameData::GetFunctionAddress(version, GameData::DS_SLEEP);
-	DWORD sleep_param = master->base_location + 0x4;
+	DWORD function_entry = Versions[version]->functions.MAIN_LOOP;
+	DWORD dsfunction_sleep = Versions[version]->functions.DS_SLEEP;
+	DWORD sleep_param = master->info.GetDetourVirtualAddress(DetourOffsetType::MY_SLEEP);
 
 	Instructions instructions(DWORD(function_entry + 0x128));
 	instructions.jmp(master->GetNextDetour());                      //jmp <detour> 
@@ -100,12 +90,12 @@ void GameData::CreateSleepFunction(GameData::Version version)
 	master->instructions.push_back(instructions);
 }
 
-void GameData::CreateRenderStaticDashFunction(GameData::Version version)
+void GameData::CreateRenderStaticDashFunction(DetourMaster* master, GameVersions version)
 {
-	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::RENDER_STATIC_DASH);
-	DWORD renderw_address = GameData::GetDWORDAddress(version, GameData::RENDER_AREA_WIDTH);
-	DWORD renderh_address = GameData::GetDWORDAddress(version, GameData::RENDER_AREA_HEIGHT);
-	DWORD light2_address = GameData::GetDWORDAddress(version, GameData::LIGHT_2_PTR);
+	DWORD function_entry = Versions[version]->functions.RENDER_STATIC_DASH;
+	DWORD renderw_address = Versions[version]->data.RENDER_AREA_WIDTH;
+	DWORD renderh_address = Versions[version]->data.RENDER_AREA_HEIGHT;
+	DWORD light2_address = Versions[version]->data.LIGHT_2_PTR;
 
 	Instructions instructions(DWORD(function_entry + 0x5A7)); //0x59B = logic block
 	//mov eax, [light1_address]
@@ -153,11 +143,11 @@ void GameData::CreateRenderStaticDashFunction(GameData::Version version)
 	master->instructions.push_back(instructions);
 }
 
-void GameData::CreateRenderDynamicDashFunction(GameData::Version version)
+void GameData::CreateRenderDynamicDashFunction(DetourMaster* master, GameVersions version)
 {
-	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::RENDER_DYNAMIC_DASH);
-	DWORD renderw_address = GameData::GetDWORDAddress(version, GameData::RENDER_AREA_WIDTH);
-	DWORD renderh_address = GameData::GetDWORDAddress(version, GameData::RENDER_AREA_HEIGHT);
+	DWORD function_entry = Versions[version]->functions.RENDER_DYNAMIC_DASH;
+	DWORD renderw_address = Versions[version]->data.RENDER_AREA_WIDTH;
+	DWORD renderh_address = Versions[version]->data.RENDER_AREA_HEIGHT;
 
 	/*
 	esi+6E = radar.x
@@ -246,7 +236,7 @@ void GameData::CreateRenderDynamicDashFunction(GameData::Version version)
 	master->instructions.push_back(instructions);
 }
 
-void GameData::CreateMenuInitFunction(GameData::Version version)
+void GameData::CreateMenuInitFunction(DetourMaster* master, GameVersions version)
 {
 	/*
 		Originally this function checked the resolution type and populated a master menu object with
@@ -256,7 +246,7 @@ void GameData::CreateMenuInitFunction(GameData::Version version)
 		be 640x480. It appears this part of the code was written with multiple resolutions in mind, however
 		it wasn't tested/working fully. 
 	*/
-	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::MENU_INIT);
+	DWORD function_entry = Versions[version]->functions.MENU_INIT;
 
 	Instructions instructions(DWORD(function_entry + 0x176));
 	instructions << ByteArray{ 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 }; //nops out cmp dword_5e7898, 1
@@ -269,16 +259,16 @@ void GameData::CreateMenuInitFunction(GameData::Version version)
 }
 
 
-void GameData::CreateGlobalInitFunction(GameData::Version version)
+void GameData::CreateGlobalInitFunction(DetourMaster* master, GameVersions version)
 {
-	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::GLOBAL_INIT); 
-	DWORD function_res = GameData::GetFunctionAddress(version, GameData::RES_LOOKUP);
+
+	DWORD function_entry = Versions[version]->functions.GLOBAL_INIT;
+	DWORD function_res = Versions[version]->functions.RES_LOOKUP;
 	//Just using these addresses as to load the width/height into, these will eventually
 	//get overwritten by themselves (as a result of this patch).
-	DWORD renderw_address = GameData::GetDWORDAddress(version, GameData::RENDER_AREA_WIDTH);
-	DWORD renderh_address = GameData::GetDWORDAddress(version, GameData::RENDER_AREA_HEIGHT);
-	DWORD skyboxh_address = GameData::GetDWORDAddress(version, GameData::SKYBOX_HEIGHT);
-
+	DWORD renderw_address = Versions[version]->data.RENDER_AREA_WIDTH;
+	DWORD renderh_address = Versions[version]->data.RENDER_AREA_HEIGHT;
+	DWORD skyboxh_address = master->info.GetDetourVirtualAddress(DetourOffsetType::SKYBOX_HEIGHT);
 
 	Instructions instructions(DWORD(function_entry + 0x90));
 	instructions.jmp(master->GetNextDetour()); //jmp <detour> 
@@ -311,21 +301,21 @@ void GameData::CreateGlobalInitFunction(GameData::Version version)
 	*/
 
 	instructions << BYTE(0xA3);
-	instructions << GameData::GetDWORDAddress(version, GameData::MENU_PTR_CAR_FACTORY) + 0x14; 
+	instructions << Versions[version]->data.MENU_PTR_CAR_FACTORY + 0x14;
 
 	instructions << BYTE(0xA3);
-	instructions << GameData::GetDWORDAddress(version, GameData::MENU_PTR_MAIN_LOADOUT) + 0x14;
+	instructions << Versions[version]->data.MENU_PTR_MAIN_LOADOUT + 0x14;
 
 	instructions << ByteArray{ 0xC7, 0x05 };
-	instructions << GameData::GetDWORDAddress(version, GameData::MENU_PTR_UNKNOWN) + 0x14; //view width
+	instructions << Versions[version]->data.MENU_PTR_UNKNOWN + 0x14; //view width
 	instructions << DWORD(0x280); 
 
 	instructions << ByteArray{ 0xC7, 0x05 };
-	instructions << GameData::GetDWORDAddress(version, GameData::MENU_PTR_UNKNOWN) + 0x8; //size width
+	instructions << Versions[version]->data.MENU_PTR_UNKNOWN + 0x8; //size width
 	instructions << DWORD(0x280);
 
 	instructions << ByteArray{ 0xC7, 0x05 };
-	instructions << GameData::GetDWORDAddress(version, GameData::MENU_PTR_UNKNOWN) + 0xC; //size height
+	instructions << Versions[version]->data.MENU_PTR_UNKNOWN + 0xC; //size height
 	instructions << DWORD(0x1E0);	
 
 	instructions << ByteArray{ 0xC7, 0x86, 0x6A, 0x4B, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00 }; //mov [esi + 4B6A], 1
@@ -353,7 +343,7 @@ void GameData::CreateGlobalInitFunction(GameData::Version version)
 	//Only used for initial refresh on high-res modes
 	instructions << ByteArray{ 0xB8, 0x04, 0x00, 0x00, 0x00 }; // mov eax, 0x4
 	instructions << BYTE(0xA3);
-	instructions << GameData::GetDWORDAddress(version, GameData::SHOULD_RENDER_DASH); //mov var, eax
+	instructions << Versions[version]->data.SHOULD_RENDER_DASH; //mov var, eax
 
 	instructions.jmp(function_entry + 0xF9); //jmp back
 
@@ -364,7 +354,7 @@ void GameData::CreateGlobalInitFunction(GameData::Version version)
 	master->instructions.push_back(instructions);
 }
 
-void GameData::CreateInitSkyboxFunction(GameData::Version version)
+void GameData::CreateInitSkyboxFunction(DetourMaster* master, GameVersions version)
 {
 	/*
 	Unfortunately this function was coded poorly. It takes in 3 arguments:
@@ -376,7 +366,7 @@ void GameData::CreateInitSkyboxFunction(GameData::Version version)
 
 	*/
 
-	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::INITIALIZE_SKYBOX);
+	DWORD function_entry = Versions[version]->functions.INITIALIZE_SKYBOX;
 
 	Instructions instructions(DWORD(function_entry + 0x42));
 	DWORD next_detour = master->GetNextDetour();
@@ -395,7 +385,7 @@ void GameData::CreateInitSkyboxFunction(GameData::Version version)
 	master->instructions.push_back(instructions);
 }
 
-void GameData::CreateMenusFunction(GameData::Version version)
+void GameData::CreateMenusFunction(DetourMaster* master, GameVersions version)
 {
 	/*
 	The "Car Lot" view requires a render width of 640 (for some reason). The menu struct pointer
@@ -406,16 +396,16 @@ void GameData::CreateMenusFunction(GameData::Version version)
 
 
 	//MENU_PTR_UNKNOWN_WIDTH populated in global init
-	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::MENU_CAR_LOT);
+	DWORD function_entry = Versions[version]->functions.MENU_CAR_LOT;
 	Instructions instructions(DWORD(function_entry + 0x587)); 
 	instructions << BYTE(0x68);
-	instructions << GameData::GetDWORDAddress(version, GameData::MENU_PTR_UNKNOWN);
+	instructions << Versions[version]->data.MENU_PTR_UNKNOWN;
 
 	printf("[Menus Patch] Generated a total of %d bytes\n", instructions.GetInstructions().size());
 	master->instructions.push_back(instructions);
 }
 
-void GameData::CreateSkyboxArgumentFunction(GameData::Version version)
+void GameData::CreateSkyboxArgumentFunction(DetourMaster* master, GameVersions version)
 {
 	/*
 	Since the arguments for the skybox width/height are hardcoded multiple times in various functions,
@@ -431,9 +421,9 @@ void GameData::CreateSkyboxArgumentFunction(GameData::Version version)
 	the return address would be different - which means that a jump detour requires
 	two of the same detour but with different return addresses (hence using a call instead).
 	*/
-		
-	DWORD skybox_height = GameData::GetDWORDAddress(version, GameData::SKYBOX_HEIGHT);
-	DWORD render_width = GameData::GetDWORDAddress(version, GameData::RENDER_AREA_WIDTH);
+	
+	DWORD skybox_height = master->info.GetDetourVirtualAddress(DetourOffsetType::SKYBOX_HEIGHT);
+	DWORD render_width = Versions[version]->data.RENDER_AREA_WIDTH;
 
 	//This function will occupy both eax and ecx
 	DWORD skybox_arg_func = master->GetNextDetour();
@@ -453,7 +443,7 @@ void GameData::CreateSkyboxArgumentFunction(GameData::Version version)
 	printf("[Skybox Arguments] Generated a total of %d bytes\n", is_size);
 	master->instructions.push_back(instructions);	
 
-	DWORD render_skybox = GameData::GetFunctionAddress(version, GameData::RENDER_SKYBOX);
+	DWORD render_skybox = Versions[version]->functions.RENDER_SKYBOX;
 	Instructions is_rs(DWORD(render_skybox + 0x17));
 	//Changing eax to ebx because we use eax in the skybox arg function
 	is_rs << ByteArray{ 0x8B, 0x5C, 0x24, 0x08 }; //mov ebx, [esp+0x8]
@@ -466,7 +456,7 @@ void GameData::CreateSkyboxArgumentFunction(GameData::Version version)
 	master->instructions.push_back(is_rs);
 	printf("[Render Skybox] Generated a total of %d bytes\n", is_rs.GetInstructions().size());
 
-	DWORD call_init_skybox = GameData::GetFunctionAddress(version, GameData::CALL_INIT_SKYBOX);
+	DWORD call_init_skybox = Versions[version]->functions.CALL_INIT_SKYBOX;
 	Instructions is_cis(DWORD(call_init_skybox + 0x42));
 	is_cis.nop(5); //Clean up for debuggers
 	is_cis.call(skybox_arg_func);
@@ -478,7 +468,7 @@ void GameData::CreateSkyboxArgumentFunction(GameData::Version version)
 	printf("[Call Init Skybox] Generated a total of %d bytes\n", is_cis.GetInstructions().size());
 }
 
-void GameData::CreateNoDashFunction(GameData::Version version)
+void GameData::CreateNoDashFunction(DetourMaster* master, GameVersions version)
 {
 	/*
 	This patch uses the 3rd person UI elements on resolutions > 640x480, luckily it preserves the 
@@ -489,14 +479,14 @@ void GameData::CreateNoDashFunction(GameData::Version version)
 	Instructions instructions(check_cockpit_func);
 	instructions << ByteArray{ 0xB8, 0x80, 0x02, 0x00, 0x00 }; //mov eax, 0x280
 	instructions << ByteArray{ 0x39, 0x05 };
-	instructions << GameData::GetDWORDAddress(version, GameData::RENDER_AREA_WIDTH); // cmp [width], eax
+	instructions << Versions[version]->data.RENDER_AREA_WIDTH; // cmp [width], eax
 	instructions << ByteArray{ 0x74, 0x0C }; //jz 0xC
 	instructions << ByteArray{ 0xB8, 0x01, 0x00, 0x00, 0x00 }; //mov eax, 1
 	instructions << ByteArray{ 0x89, 0x81, 0x32, 0x05, 0x04, 0x00 }; //mov [ecx+0x40532], eax
 	instructions << BYTE(0xC3); //ret
 	instructions << ByteArray{ 0x33, 0xC0 }; //xor eax, eax
 	instructions << ByteArray{ 0x83, 0x3D };
-	instructions << GameData::GetDWORDAddress(version, GameData::SHOULD_RENDER_DASH);
+	instructions << Versions[version]->data.SHOULD_RENDER_DASH;
 	instructions << BYTE(0x00); //cmp should_render, 0
 	instructions << ByteArray{ 0x74, 0x01 }; //jmp 0x1
 	instructions << BYTE(0x40); //inc eax
@@ -505,24 +495,23 @@ void GameData::CreateNoDashFunction(GameData::Version version)
 								
 	master->SetLastDetourSize(instructions.GetInstructions().size());
 
-	DWORD rsd_entry = GameData::GetFunctionAddress(version, GameData::RENDER_STATIC_DASH);
+	DWORD rsd_entry = Versions[version]->functions.RENDER_STATIC_DASH;
 	instructions.relocate(DWORD(rsd_entry + 0x589));
 	instructions.call(check_cockpit_func);	
 
-	DWORD rd_entry = GameData::GetFunctionAddress(version, GameData::RENDER_DASH);
+	DWORD rd_entry = Versions[version]->functions.RENDER_DASH;
 	instructions.relocate(DWORD(rd_entry + 0x4B));
 	instructions << ByteArray{ 0x8B, 0x0D };
-	instructions << GameData::GetDWORDAddress(version, GameData::MAIN_DASH_PTR);
+	instructions << Versions[version]->data.MAIN_DASH_PTR;
 	instructions.call(check_cockpit_func);
 
 	master->instructions.push_back(instructions);
 	printf("[Create No-Dash (Hi-Res)] Generated a total of %d bytes\n", instructions.GetInstructions().size());
 }
 
-void GameData::CreateResolutionFunction(GameData::Version version)
+void GameData::CreateResolutionFunction(DetourMaster* master, GameVersions version)
 {
-	//DWORD function_entry = Versions[version]->functions.RES_LOOKUP;
-	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::RES_LOOKUP);
+	DWORD function_entry = Versions[version]->functions.RES_LOOKUP;
 
 	Instructions instructions(DWORD(function_entry + 0x13));
 	instructions << DWORD(0x400);
@@ -534,78 +523,17 @@ void GameData::CreateResolutionFunction(GameData::Version version)
 	instructions.relocate(function_entry + 0x79);
 	instructions << DWORD(0x320);
 
-	//size_t is_size = instructions.GetInstructions().size();
-	//master->SetLastDetourSize(is_size);
 	printf("[Resolution Lookup] Generated a total of %d bytes\n", instructions.GetInstructions().size());
-	//printf("DetourMaster now points to address starting at %x\n", master->current_location);
 	master->instructions.push_back(instructions);
 }
 
-DWORD GameData::GetFunctionAddress(Version version, FunctionType ftype)
+void GameData::CreateTimedFunction(DetourMaster* master, GameVersions version)
 {
-	return games[version].functions[ftype];
-}
-
-DWORD GameData::GetDWORDAddress(Version version, DWORDType dtype)
-{
-	return games[version].global_dwords[dtype];
-}
-
-void GameData::initialize(PEINFO info)
-{
-	if (master)
-	{
-		delete master;
-		master = nullptr;
-	}
-
-	master = new DetourMaster(info);
-	Patcher::SetDetourMaster(master);
-
-	Game version_classics; 
-	version_classics.functions[MAIN_LOOP] = 0x5169B0;
-	version_classics.functions[DS_SLEEP] = 0xC53794;
-	version_classics.functions[CD_CHECK] = 0x5317F0;
-	version_classics.functions[RENDERER] = 0x470480;	
-	version_classics.functions[RENDER_STATIC_DASH] = 0x453160;
-	version_classics.functions[GLOBAL_INIT] = 0x46F8A0;
-	version_classics.functions[RENDER_DYNAMIC_DASH] = 0x450F40;
-	version_classics.functions[MENU_INIT] = 0x42E860;
-	version_classics.functions[RES_LOOKUP] = 0x49C4C0;
-	version_classics.functions[UNKNOWN_INIT_FUNCTION] = 0x456990;
-	version_classics.functions[RENDER_DASH] = 0x4542A0;
-
-	version_classics.functions[INITIALIZE_SKYBOX] = 0x54C780;
-	version_classics.functions[RENDER_SKYBOX] = 0x54CB70;
-	version_classics.functions[CALL_INIT_SKYBOX] = 0x4A1B70;
-	
-	version_classics.global_dwords[RENDERER_TYPE] = 0x6906BC; //0 = Software, 1 = Glide, 2 = OpenGL	
-	version_classics.global_dwords[SHOW_DEBUG] = 0x5E7954; //1 = on, 0 = off, loc_4541C8
-
-	version_classics.functions[MENU_CAR_LOT] = 0x425C40;
-	version_classics.functions[MENU_CAR_FACTORY] = 0x478CC0;
-	version_classics.functions[MENU_MAIN_LOADOUT] = 0x413500;
-
-	version_classics.global_dwords[MENU_PTR_CAR_FACTORY] = 0x5E87C0;
-	version_classics.global_dwords[MENU_PTR_MAIN_LOADOUT] = 0x5E6A88;
-	version_classics.global_dwords[MENU_PTR_UNKNOWN] = 0x697830;
-
-
-	version_classics.global_dwords[LIGHT_1_PTR] = 0x5E7970;
-	version_classics.global_dwords[LIGHT_2_PTR] = 0x5E7974;
-	version_classics.global_dwords[RENDER_AREA_WIDTH] = 0x5E7880;
-	version_classics.global_dwords[RENDER_AREA_HEIGHT] = 0x5E7884;
-	version_classics.global_dwords[RES_TYPE] = 0x5E7898; //Default = 1, 640x480
-	version_classics.global_dwords[MAIN_DASH_PTR] = 0x5E79C8;
-	version_classics.global_dwords[SHOULD_RENDER_DASH] = 0x5E7900;
-
-	//---------- IN PROGRESS
-	version_classics.functions[VERSIONS] = 0x470F90;	
-	version_classics.functions[MENU_STRUCT_PROCESSOR] = 0x4A9BA5;
-
-	//---------- Below here contains completely new functions/variables
-	version_classics.global_dwords[MY_SLEEP] = master->base_location + 0x4;
-	version_classics.global_dwords[SKYBOX_HEIGHT] = master->base_location + 0x8;
-	games[VERSION_1_0] = version_classics;
-
+	//The goal of this is to always set 0x6293E4 to 0, bypassing 4B3B00
+	DWORD function_entry = Versions[version]->functions.TIMED_FUNCTION;
+	Instructions instructions(DWORD(function_entry + 0x35));
+	instructions << BYTE(0x00); //hacky, sets the mov value from 1 to 0
+	instructions.relocate(Versions[version]->data.TIMED_VAR); 
+	instructions << BYTE(0x00);
+	master->instructions.push_back(instructions);
 }

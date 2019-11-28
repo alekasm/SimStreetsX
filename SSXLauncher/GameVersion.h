@@ -1,0 +1,103 @@
+#pragma once
+#include <Windows.h>
+
+struct FunctionType
+{
+	DWORD MAIN_LOOP;
+	DWORD CD_CHECK; 
+	DWORD DS_SLEEP;
+	DWORD VERSIONS;
+	DWORD RENDERER;
+	DWORD RES_LOOKUP;
+	DWORD GLOBAL_INIT;
+	DWORD RENDER_STATIC_DASH;
+	DWORD RENDER_DYNAMIC_DASH;
+	DWORD MENU_INIT;
+	DWORD INITIALIZE_SKYBOX;
+	DWORD RENDER_SKYBOX;
+	DWORD CALL_INIT_SKYBOX;
+	DWORD MENU_STRUCT_PROCESSOR;
+	DWORD MENU_CAR_LOT;
+	DWORD MENU_MAIN_LOADOUT;
+	DWORD MENU_CAR_FACTORY;
+	DWORD UNKNOWN_INIT_FUNCTION;
+	DWORD RENDER_DASH;
+	DWORD TIMED_FUNCTION;
+};
+
+struct DataType
+{
+	DWORD RENDERER_TYPE;
+	DWORD RES_TYPE;
+	DWORD SHOW_DEBUG;
+	DWORD LIGHT_1_PTR;
+	DWORD LIGHT_2_PTR;
+	DWORD RENDER_AREA_WIDTH;
+	DWORD RENDER_AREA_HEIGHT;
+	DWORD MENU_PTR_CAR_FACTORY;
+	DWORD MENU_PTR_MAIN_LOADOUT;
+	DWORD MENU_PTR_UNKNOWN;
+	DWORD SHOULD_RENDER_DASH;
+	DWORD MAIN_DASH_PTR;
+	DWORD TIMED_VAR;
+};
+
+struct DetourOffsetType
+{
+	static const DWORD MY_SLEEP = 0x4;
+	static const DWORD SKYBOX_HEIGHT = 0x8;
+};
+
+struct GameVersion
+{
+	FunctionType functions;
+	DataType data;
+};
+
+const struct VersionClassics : GameVersion
+{
+	VersionClassics()
+	{
+		functions.MAIN_LOOP = 0x5169B0;
+		functions.CD_CHECK = 0x5317F0;
+		functions.DS_SLEEP = 0xC53794;
+		functions.VERSIONS = 0x470F90;
+		functions.RENDERER = 0x470480;
+		functions.RES_LOOKUP = 0x49C4C0;
+		functions.GLOBAL_INIT = 0x46F8A0;
+		functions.RENDER_STATIC_DASH = 0x453160;
+		functions.RENDER_DYNAMIC_DASH = 0x450F40;
+		functions.MENU_INIT = 0x42E860;
+		functions.INITIALIZE_SKYBOX = 0x54C780;
+		functions.RENDER_SKYBOX = 0x54CB70;
+		functions.CALL_INIT_SKYBOX = 0x4A1B70;
+		functions.MENU_STRUCT_PROCESSOR = 0x4A9BA5;
+		functions.MENU_CAR_LOT = 0x425C40;
+		functions.MENU_MAIN_LOADOUT = 0x413500;
+		functions.MENU_CAR_FACTORY = 0x478CC0;
+		functions.UNKNOWN_INIT_FUNCTION = 0x456990;
+		functions.RENDER_DASH = 0x4542A0;
+		functions.TIMED_FUNCTION = 0x4AB3D0;
+
+		data.RENDERER_TYPE = 0x6906BC; //0 = Software, 1 = Glide, 2 = OpenGL	
+		data.RES_TYPE = 0x5E7898; //Default = 1, 640x480
+		data.SHOW_DEBUG = 0x5E7954; //1 = on, 0 = off, loc_4541C8
+		data.LIGHT_1_PTR = 0x5E7970;
+		data.LIGHT_2_PTR = 0x5E7974;
+		data.RENDER_AREA_WIDTH = 0x5E7880;
+		data.RENDER_AREA_HEIGHT = 0x5E7884;
+		data.MENU_PTR_CAR_FACTORY = 0x5E87C0;
+		data.MENU_PTR_MAIN_LOADOUT = 0x5E6A88;
+		data.MENU_PTR_UNKNOWN = 0x697830;
+		data.SHOULD_RENDER_DASH = 0x5E7900;
+		data.MAIN_DASH_PTR = 0x5E79C8;
+		data.TIMED_VAR = 0x6293E4;
+	}
+} version_classics;
+
+//The order of this matters
+enum GameVersions { VCLASSICS };
+static const GameVersion* const Versions[1] =
+{
+	&version_classics
+};

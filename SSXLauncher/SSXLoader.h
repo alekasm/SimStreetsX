@@ -18,17 +18,24 @@
 #pragma comment(lib, "Kernel32.lib")
 #pragma comment(lib, "Advapi32.lib" )
 
+struct SSXParameters
+{
+	bool verify_install;
+	unsigned int sleep_time;
+	unsigned int resolution_mode;
+	bool fullscreen;
+};
+
 class SSXLoader
 {
 public:
 	static bool LoadFiles();	
 	static int GetPatchedSSXVersion();
 	static std::string GetStreetsGameLocation();
-	static bool CreatePatchedGame(std::string, bool);
-	static bool StartSSX(int sleep_time, int resolution_mode, bool fullscreen);	
+	static bool CreatePatchedGame(std::string, SSXParameters);
+	static bool StartSSX(SSXParameters);	
 	static bool GetValidInstallation();
-	static const unsigned int SSX_VERSION = 1;
+	static const unsigned int SSX_VERSION = 2;
 private:
-	static bool InitializeGameData(std::string);
 	static bool GetFileCompatability(std::string);	
 };

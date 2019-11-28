@@ -1,35 +1,12 @@
 #include "Patcher.h"
 
-namespace
+bool Patcher::Patch(PEINFO info, std::vector<Instructions> instructions, std::string exe_fname)
 {
-	DetourMaster* detour_master;
-}
-
-void Patcher::SetDetourMaster(DetourMaster* master)
-{
-	detour_master = master;
-}
-
-bool Patcher::Patch(Instructions instructions, std::string exe_fname)
-{
-	std::vector<Instructions> ins;
-	ins.push_back(instructions);
-	return Patch(ins, exe_fname);
-}
-
-bool Patcher::Patch(std::vector<Instructions> instructions, std::string exe_fname)
-{
-	if (detour_master == nullptr)
-	{
-		OutputDebugString("Patcher has not been initialized yet, DetourMaster is null. \n");
-		return false;
-	}
-
 	FILE* efile;
 	int result = fopen_s(&efile, exe_fname.c_str(), "r+");
 
 	if (efile == NULL)
-	{		
+	{
 		OutputDebugString(std::string("Failed to load exe file: " + exe_fname + "\n").c_str());
 		OutputDebugString(std::string("Reason: fopen_s returns error code: " + std::to_string(result) + "\n").c_str());
 		return false;
@@ -40,7 +17,7 @@ bool Patcher::Patch(std::vector<Instructions> instructions, std::string exe_fnam
 	{
 		for (Instruction instruction : is.GetInstructions())
 		{
-			DWORD address = detour_master->GetFileOffset(instruction.address);
+			DWORD address = GetFileOffset(info, instruction.address);
 			/*
 			char buffer[256];
 			sprintf_s(buffer, sizeof(buffer), "VA = %x, FO = %x, BYTE: %x \n", instruction.address, address, instruction.byte);
@@ -59,14 +36,31 @@ bool Patcher::Patch(std::vector<Instructions> instructions, std::string exe_fnam
 	return true;
 }
 
-DWORD Patcher::align(DWORD size, DWORD align, DWORD addr) 
+DWORD Patcher::GetFileOffset(PEINFO info, DWORD address)
+{
+	//TODO this function is very inefficient
+	for (auto it = info.data_map.begin(); it != info.data_map.end(); ++it)
+	{
+		DWORD start_address = it->second.RealVirtualAddress;
+		DWORD end_address = start_address + it->second.VirtualSize;
+		if (address >= start_address && address <= end_address)
+		{
+			//printf("-     %x is in  %s\n", address, it->first.c_str());
+			return (address - start_address) + it->second.RawDataPointer;
+		}
+	}
+	printf("Failed to find section where address %x belongs\n", address);
+	return NULL;
+}
+
+DWORD Patcher::align(DWORD size, DWORD align, DWORD addr)
 {
 	if (!(size % align))
 		return addr + size;
 	return addr + (size / align + 1) * align;
 }
 
-bool Patcher::CreateDetourSection(const char *filepath, PEINFO *info)
+bool Patcher::CreateDetourSection(const char* filepath, PEINFO* info)
 {
 	const char* section_name = ".detour";
 	DWORD section_size = 2048;
@@ -74,13 +68,13 @@ bool Patcher::CreateDetourSection(const char *filepath, PEINFO *info)
 	HANDLE file = CreateFile(filepath, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	if (file == INVALID_HANDLE_VALUE)
 	{
-		OutputDebugString(std::string("Invalid handle when attempting to check detour sections: \n" + std::string(filepath) +"\n").c_str());
+		OutputDebugString(std::string("Invalid handle when attempting to check detour sections: \n" + std::string(filepath) + "\n").c_str());
 		OutputDebugString(std::string("Reason: " + std::to_string(GetLastError()) + "\n").c_str());
 		return false;
 	}
 
 	DWORD fileSize = GetFileSize(file, NULL);
-	BYTE *pByte = new BYTE[fileSize];
+	BYTE* pByte = new BYTE[fileSize];
 	DWORD dw;
 	ReadFile(file, pByte, fileSize, &dw, NULL);
 
@@ -101,6 +95,7 @@ bool Patcher::CreateDetourSection(const char *filepath, PEINFO *info)
 	{
 		std::string name(reinterpret_cast<char const*>(SH[i].Name));
 		info->data_map[name].VirtualAddress = SH[i].VirtualAddress;
+		info->data_map[name].RealVirtualAddress = SH[i].VirtualAddress + WIN32_PE_ENTRY;
 		info->data_map[name].RawDataPointer = SH[i].PointerToRawData;
 		info->data_map[name].VirtualSize = SH[i].Misc.VirtualSize;
 		if (name.compare(section_name) == 0)
@@ -136,9 +131,10 @@ bool Patcher::CreateDetourSection(const char *filepath, PEINFO *info)
 	OutputDebugString(std::string("Added .detour section, total sections: " + std::to_string(FH->NumberOfSections) + "\n").c_str());
 	std::string name(reinterpret_cast<char const*>(SH[new_size].Name));
 	info->data_map[name].VirtualAddress = SH[new_size].VirtualAddress;
+	info->data_map[name].RealVirtualAddress = SH[new_size].VirtualAddress + WIN32_PE_ENTRY;
 	info->data_map[name].RawDataPointer = SH[new_size].PointerToRawData;
 	info->data_map[name].VirtualSize = SH[new_size].Misc.VirtualSize;
-	
+
 	char buffer[256];
 	sprintf_s(buffer, sizeof(buffer), "Created .detour section at 0x%x\n", info->data_map[".detour"].VirtualAddress);
 	OutputDebugString(std::string(buffer).c_str());
@@ -148,6 +144,6 @@ bool Patcher::CreateDetourSection(const char *filepath, PEINFO *info)
 	{
 		OutputDebugString(std::string("Error closing the file, error code: " + std::to_string(GetLastError()) + "\n").c_str());
 	}
-	
+
 	return true;
 }
