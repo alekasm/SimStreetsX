@@ -24,6 +24,7 @@ bool GameData::PatchGame(std::string game_exe, GameData::Version version)
 	CreateSkyboxArgumentFunction(version);
 	CreateMenusFunction(version);
 	CreateNoDashFunction(version);
+	CreateResolutionFunction(version);
 	return Patcher::Patch(master->instructions, game_exe);
 }
 
@@ -518,6 +519,28 @@ void GameData::CreateNoDashFunction(GameData::Version version)
 	printf("[Create No-Dash (Hi-Res)] Generated a total of %d bytes\n", instructions.GetInstructions().size());
 }
 
+void GameData::CreateResolutionFunction(GameData::Version version)
+{
+	//DWORD function_entry = Versions[version]->functions.RES_LOOKUP;
+	DWORD function_entry = GameData::GetFunctionAddress(version, GameData::RES_LOOKUP);
+
+	Instructions instructions(DWORD(function_entry + 0x13));
+	instructions << DWORD(0x400);
+	instructions.relocate(function_entry + 0x19);
+	instructions << DWORD(0x240);
+
+	instructions.relocate(function_entry + 0x73);
+	instructions << DWORD(0x500);
+	instructions.relocate(function_entry + 0x79);
+	instructions << DWORD(0x320);
+
+	//size_t is_size = instructions.GetInstructions().size();
+	//master->SetLastDetourSize(is_size);
+	printf("[Resolution Lookup] Generated a total of %d bytes\n", instructions.GetInstructions().size());
+	//printf("DetourMaster now points to address starting at %x\n", master->current_location);
+	master->instructions.push_back(instructions);
+}
+
 DWORD GameData::GetFunctionAddress(Version version, FunctionType ftype)
 {
 	return games[version].functions[ftype];
@@ -564,11 +587,9 @@ void GameData::initialize(PEINFO info)
 	version_classics.functions[MENU_MAIN_LOADOUT] = 0x413500;
 
 	version_classics.global_dwords[MENU_PTR_CAR_FACTORY] = 0x5E87C0;
-	//version_classics.global_dwords[MENU_PTR_CAR_FACTORY_WIDTH] = 0x5E87D4; //base + 0x14
 	version_classics.global_dwords[MENU_PTR_MAIN_LOADOUT] = 0x5E6A88;
-	//version_classics.global_dwords[MENU_PTR_MAIN_LOADOUT_WIDTH] = 0x5E6A9C; //base + 0x14
 	version_classics.global_dwords[MENU_PTR_UNKNOWN] = 0x697830;
-	//version_classics.global_dwords[MENU_PTR_UNKNOWN_WIDTH] = 0x697844; //base +0x14	
+
 
 	version_classics.global_dwords[LIGHT_1_PTR] = 0x5E7970;
 	version_classics.global_dwords[LIGHT_2_PTR] = 0x5E7974;

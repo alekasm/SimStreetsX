@@ -45,6 +45,7 @@ private:
 	static void CreateInitSkyboxFunction(GameData::Version version);
 	static void CreateMenusFunction(GameData::Version version);
 	static void CreateNoDashFunction(GameData::Version version);
+	static void CreateResolutionFunction(GameData::Version version);
 };
 
 
