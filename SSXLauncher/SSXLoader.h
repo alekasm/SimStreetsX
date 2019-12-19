@@ -36,7 +36,7 @@ public:
 	static bool CreatePatchedGame(std::string, SSXParameters);
 	static bool StartSSX(SSXParameters);	
 	static bool GetValidInstallation();
-	static const unsigned int SSX_VERSION = 2;
+	static const unsigned int SSX_VERSION = 3;
 private:
 	static bool GetFileCompatability(std::string);	
 };
