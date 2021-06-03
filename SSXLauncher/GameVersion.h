@@ -23,6 +23,7 @@ struct FunctionType
 	DWORD UNKNOWN_INIT_FUNCTION;
 	DWORD RENDER_DASH;
 	DWORD TIMED_FUNCTION;
+	DWORD ADD_FONT;
 };
 
 struct DataType
@@ -78,6 +79,7 @@ const struct VersionClassics : GameVersion
 		functions.UNKNOWN_INIT_FUNCTION = 0x456990;
 		functions.RENDER_DASH = 0x4542A0;
 		functions.TIMED_FUNCTION = 0x4AB3D0;
+		functions.ADD_FONT = 0x538DE0;
 
 		data.RENDERER_TYPE = 0x6906BC; //0 = Software, 1 = Glide, 2 = OpenGL	
 		data.RES_TYPE = 0x5E7898; //Default = 1, 640x480

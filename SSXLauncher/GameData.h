@@ -23,6 +23,7 @@ private:
 	static void CreateNoDashFunction(DetourMaster*, GameVersions);
 	static void CreateResolutionFunction(DetourMaster*, GameVersions);
 	static void CreateTimedFunction(DetourMaster*, GameVersions);
+	static void CreateAddFontFunction(DetourMaster*, GameVersions);
 };
 
 

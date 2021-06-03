@@ -17,6 +17,7 @@ std::vector<Instructions> GameData::GenerateData(PEINFO info, GameVersions versi
 	CreateNoDashFunction(master, version);
 	CreateResolutionFunction(master, version);
 	CreateTimedFunction(master, version);
+	CreateAddFontFunction(master, version);
 	std::vector<Instructions> ret_ins(master->instructions);
 	delete master;
 	return ret_ins;
@@ -30,6 +31,32 @@ void GameData::CreateCDFunction(DetourMaster* master, GameVersions version)
 
 	size_t is_size = instructions.GetInstructions().size();
 	printf("[CD Check Bypass] Generated a total of %d bytes\n", is_size);
+	master->instructions.push_back(instructions);
+}
+
+void GameData::CreateAddFontFunction(DetourMaster* master, GameVersions version)
+{
+	/*
+	The current code for this function is:
+	if(AddFontResourceA("Hatten.ttf"))
+	  SendMessage(HWND_BROADCAST, WM_FONTCHANGE, 0, 0);
+
+	The reason for the HWND_BROADCAST is outlined here:
+	https://docs.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-addfontresourcea
+
+	However this causes a hanging issue outlined here:
+	https://docs.microsoft.com/en-us/windows/win32/win7appqual/preventing-hangs-in-windows-applications
+
+	Since the font is added BEFORE the HWND is created, we cannot specify WM_FONTCHANGE to the HWND directly.
+	This does however mean that the font should be already loaded before CreateWindowExA is called.	Simply
+	remove the call to SendMessage HWND_BROADCAST
+	*/
+	DWORD function_entry = Versions[version]->functions.ADD_FONT;
+	Instructions instructions(DWORD(function_entry + 0xC));
+	instructions.nop(25);
+
+	size_t is_size = instructions.GetInstructions().size();
+	printf("[Add Font Patch] Generated a total of %d bytes\n", is_size);
 	master->instructions.push_back(instructions);
 }
 
